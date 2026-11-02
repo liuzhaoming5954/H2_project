@@ -142,6 +142,11 @@ class RuntimeContract(unittest.TestCase):
         self.permit(session)
         self.spin_for(0.08)
         self.assertFalse(self.status.enabled, "late first permit must not revive an expired enable")
+        late_revoke = self.permit(session, 2)
+        late_revoke.enabled = False
+        self.permits.publish(late_revoke)
+        self.spin_for(0.08)
+        self.assertEqual(self.status.reason, "pending_permission_timeout")
         session = self.set_enabled()
 
         self.permit(session)
@@ -164,6 +169,16 @@ class RuntimeContract(unittest.TestCase):
         self.spin_for(0.08)
         self.assertFalse(self.status.enabled, "permit alone must not rearm an expired session")
         self.assertAlmostEqual(self.odom.pose.pose.position.x, stopped_x)
+        late_revoke = self.permit(session, 3)
+        late_revoke.enabled = False
+        self.permits.publish(late_revoke)
+        expired = self.command(session, 3)
+        expired.sequence = 4
+        expired.header.stamp = (self.node.get_clock().now() - RosDuration(seconds=5)).to_msg()
+        self.commands.publish(expired)
+        self.spin_for(0.08)
+        self.assertEqual(self.status.reason, "command_expired",
+                         "in-flight revocation/stale traffic must preserve the original stop cause")
 
         fresh_session = self.set_enabled()
         self.assertNotEqual(fresh_session, session)

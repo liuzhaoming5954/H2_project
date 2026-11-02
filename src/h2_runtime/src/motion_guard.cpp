@@ -161,6 +161,10 @@ class MotionGuardNode final : public rclcpp::Node {
     }
     const Time now = monotonic_now();
     expire_pending(now);
+    const auto current = guard_.tick(now);
+    if (!pending_ && !current.armed) {
+      return;  // Preserve the first stop cause; old-session traffic cannot replace it.
+    }
     if (msg.header.frame_id != base_frame_) {
       boundary_stop("invalid_permit_frame", now);
       return;
@@ -201,14 +205,18 @@ class MotionGuardNode final : public rclcpp::Node {
   }
 
   void on_command(const h2_interfaces::msg::MotionCommand& msg) {
-    if (pending_ || session_.empty() || msg.session_id != session_ ||
+    if (session_.empty() || msg.session_id != session_ ||
         msg.source != command_source_) {
       return;
+    }
+    const Time now = monotonic_now();
+    expire_pending(now);
+    if (pending_ || !guard_.tick(now).armed) {
+      return;  // A latched stop remains diagnostic evidence until explicit re-enable.
     }
     if (have_command_ && msg.sequence <= last_command_.sequence) {
       return;  // A delayed/replayed old packet cannot replace a newer command.
     }
-    const Time now = monotonic_now();
     if (msg.header.frame_id != base_frame_ || !finite_twist(msg.velocity) ||
         msg.velocity.linear.z != 0.0 || msg.velocity.angular.x != 0.0 ||
         msg.velocity.angular.y != 0.0) {

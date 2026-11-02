@@ -1,0 +1,22 @@
+motion_guard:
+  ros__parameters:
+    command_source: navigation
+    permit_source: supervisor
+    base_frame: base_footprint
+    update_rate_hz: 50.0
+    max_command_validity_s: 0.5
+    max_permit_validity_s: 0.5
+    max_forward_mps: 0.2
+    max_yaw_rps: 0.3
+supervisor:
+  ros__parameters:
+    mode: sim
+    max_observation_age_s: 0.3
+    permit_validity_s: 0.25
+    rate_hz: 20.0
+    odom_frame: odom
+    base_frame: base_footprint
+mock_platform:
+  ros__parameters:
+    odom_frame: odom
+    base_frame: base_footprint

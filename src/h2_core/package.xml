@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>h2_core</name>
+  <version>0.1.0</version>
+  <description>ROS-independent motion permission and command expiry core.</description>
+  <maintainer email="7611578+liuzhaoming5954@users.noreply.github.com">H2 project maintainers</maintainer>
+  <license>Proprietary</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

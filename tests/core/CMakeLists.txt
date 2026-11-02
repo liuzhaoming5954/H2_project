@@ -1,0 +1,7 @@
+add_executable(h2_motion_guard_tests motion_guard_test.cpp)
+target_link_libraries(h2_motion_guard_tests PRIVATE h2_core)
+target_compile_features(h2_motion_guard_tests PRIVATE cxx_std_17)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  target_compile_options(h2_motion_guard_tests PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+add_test(NAME h2_motion_guard_tests COMMAND h2_motion_guard_tests)

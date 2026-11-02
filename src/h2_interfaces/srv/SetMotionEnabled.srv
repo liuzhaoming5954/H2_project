@@ -1,0 +1,6 @@
+# Explicit operator action. Enable creates a new session; a permit is still required.
+bool enable
+---
+bool success
+string message
+string session_id

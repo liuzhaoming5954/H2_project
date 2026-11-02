@@ -5,6 +5,7 @@ log/
 
 # Python development
 .venv/
+.tools/
 venv/
 __pycache__/
 *.py[cod]

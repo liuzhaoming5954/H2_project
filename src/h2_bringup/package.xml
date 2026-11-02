@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>h2_bringup</name>
+  <version>0.1.0</version>
+  <description>Explicitly isolated launch modes for the H2 navigation foundation.</description>
+  <maintainer email="7611578+liuzhaoming5954@users.noreply.github.com">H2 project team</maintainer>
+  <license>Proprietary</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>h2_runtime</exec_depend>
+  <exec_depend>h2_supervisor</exec_depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

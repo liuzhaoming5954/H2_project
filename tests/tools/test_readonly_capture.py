@@ -79,7 +79,7 @@ class RawDiagnosticsTests(unittest.TestCase):
         self.assertEqual(report["lidar"]["errors"]["nonincreasing_stamp"], 1)
         self.assertEqual(report["imu"]["errors"]["nonincreasing_stamp"], 1)
 
-    def test_count_timebase_and_offset_corruption_fail(self):
+    def test_count_and_timebase_corruption_fail(self):
         checker = self.nominal()
         msg = cloud(2_100_000_000, offsets=(10, 0))
         msg.point_num += 1
@@ -87,8 +87,17 @@ class RawDiagnosticsTests(unittest.TestCase):
         checker.observe_lidar(msg, 1.01, 2_100_000_000)
         report = self.report(checker)
         self.assertFalse(report["data_checks_passed"])
-        for name in ("point_num_mismatch", "header_timebase_mismatch", "nonmonotonic_point_offsets"):
+        for name in ("point_num_mismatch", "header_timebase_mismatch"):
             self.assertIn(name, report["lidar"]["errors"])
+
+    def test_in_range_point_offsets_may_arrive_out_of_order(self):
+        checker = self.nominal()
+        checker.observe_lidar(cloud(2_100_000_000, offsets=(0, 30_000_000, 20_000_000)),
+                              1.01, 2_100_000_000)
+        report = self.report(checker)
+        self.assertTrue(report["data_checks_passed"])
+        self.assertEqual(report["lidar"]["warnings"], {"nonmonotonic_point_offsets": 1})
+        self.assertEqual(report["lidar"]["scan_span_max_ns"], 30_000_000)
 
     def test_nonfinite_observations_fail(self):
         checker = self.nominal()

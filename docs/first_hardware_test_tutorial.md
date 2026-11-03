@@ -149,7 +149,7 @@ python3 tools/readonly_capture.py inspect \
   --report "$PWD/data/first-test-001/livox-inspect.json"
 ```
 
-等待命令打印报告。看到 `"ok": true`，说明检查窗口内收到了符合本轮要求的点云和 IMU。若 `ok` 为 `false`，先检查终端 A 是否仍在运行、两个终端是否都设置了域 81，以及雷达供电、网口、地址和驱动日志。需要重跑时换一个新的报告文件名，保留之前的诊断。
+等待命令打印报告。看到 `"ok": true`，说明检查窗口内收到了符合本轮要求的点云和 IMU。若 `ok` 为 `false`，先检查终端 A 是否仍在运行、两个终端是否都设置了域 81，以及雷达供电、网口、地址和驱动日志。需要重跑时换一个新的报告文件名，保留之前的诊断。如果 `lidar.warnings` 只有 `nonmonotonic_point_offsets` 且 `ok` 为 `true`，可以继续录制。它统计一帧内偏移的回退次数，录包会保留收到的原始点序。
 
 通过后在终端 B 运行：
 

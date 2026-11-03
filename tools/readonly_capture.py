@@ -138,6 +138,7 @@ class RawDiagnostics:
         self.scan_span_min_ns = self.scan_span_max_ns = None
         self.lidar_end_max_ns = None
         self.points_seen = 0
+        self.nonmonotonic_point_offsets = 0
         self.lines = set()
         self.tags = set()
 
@@ -161,7 +162,8 @@ class RawDiagnostics:
                 continue
             offsets.append(offset)
             if previous is not None and offset < previous:
-                self.lidar.errors["nonmonotonic_point_offsets"] += 1
+                # The Livox driver preserves packet arrival order in CustomMsg.
+                self.nonmonotonic_point_offsets += 1
             previous = offset
             if not all(math.isfinite(value) for value in (point.x, point.y, point.z)):
                 self.lidar.errors["nonfinite_point"] += 1
@@ -190,6 +192,9 @@ class RawDiagnostics:
         lidar.update({"points_seen": self.points_seen, "scan_span_min_ns": self.scan_span_min_ns,
                       "scan_span_max_ns": self.scan_span_max_ns,
                       "line_values": sorted(self.lines), "tag_values": sorted(self.tags)})
+        lidar["warnings"] = {}
+        if self.nonmonotonic_point_offsets:
+            lidar["warnings"]["nonmonotonic_point_offsets"] = self.nonmonotonic_point_offsets
         imu.update({"linear_acceleration_unit": "g (raw pinned Livox driver)",
                     "angular_velocity_unit": "rad/s", "orientation_validity": "not established"})
         overlap = None

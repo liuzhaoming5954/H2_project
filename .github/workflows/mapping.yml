@@ -1,0 +1,46 @@
+name: Mapping dependency build
+
+on:
+  pull_request:
+    paths:
+      - dependencies/**
+      - scripts/*mapping*
+      - scripts/fetch_navigation_sources.sh
+      - tests/ros/test_mapping_binaries.py
+      - .github/workflows/mapping.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  jazzy-mapping:
+    runs-on: ubuntu-24.04
+    container: ros:jazzy-ros-base
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install versioned mapping prerequisites
+        run: bash scripts/install_mapping_dependencies.sh
+      - name: Fetch immutable source versions and submodules
+        run: bash scripts/fetch_navigation_sources.sh
+      - name: Build SDK, Livox driver and FAST-LIO2
+        run: bash scripts/build_mapping_dependencies.sh
+      - name: Start isolated LIO and RTAB-Map without sensor inputs
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          source install/mapping/setup.bash
+          python3 tests/ros/test_mapping_binaries.py
+      - name: Preserve mapping build logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mapping-build-evidence
+          path: |
+            log/mapping
+            artifacts/mapping-smoke
+            vendor/actual.repos
+          if-no-files-found: ignore

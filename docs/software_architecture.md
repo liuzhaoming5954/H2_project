@@ -78,7 +78,7 @@ flowchart TD
 
 依据：NVIDIA 当前 JetPack 7 使用 Ubuntu 24.04，ROS 2 Jazzy 提供 Noble arm64 支持；但宇树 ROS 2 仓库只明确列出 Foxy/Humble 的测试环境，因此 Jazzy 与 H2 的整机组合仍需验证。若 SDK 所需 CycloneDDS/ABI 与 ROS 2 运行时冲突，将 SDK 通信放入独立进程，通过 Unix socket 等本地 IPC 与 ROS 2 适配节点交换命令及状态。该隔离是工程备选方案，不是已验证的官方组合。[NVIDIA JetPack](https://developer.nvidia.com/embedded/jetpack)、[ROS 2 Jazzy 安装文档源码](https://github.com/ros2/ros2_documentation/blob/jazzy/source/Installation/Ubuntu-Install-Debs.rst)、[Unitree ROS 2](https://github.com/unitreerobotics/unitree_ros2)。
 
-Livox 官方驱动已提供 Jazzy 构建路径，但将自身定位为调试工具，产品化需完善异常恢复和资源管理。FAST-LIO 官方已有 MID-360 配置，官方主仓启动链仍为 ROS 1；ROS 2 移植、消息适配及维护成本必须计入研发计划。[Livox 驱动](https://github.com/Livox-SDK/livox_ros_driver2)、[FAST-LIO](https://github.com/hku-mars/FAST_LIO)。
+Livox 官方驱动已提供 Jazzy 构建路径，但将自身定位为调试工具，产品化需完善异常恢复和资源管理。FAST-LIO 官方主分支为 ROS 1，也已提供独立的大写 `ROS2` 分支；本项目当前锁定已有 MID-360/driver2 接入的 Ericsii ROS 2 实现，仍需承担适配维护和数据回归工作。[Livox 驱动](https://github.com/Livox-SDK/livox_ros_driver2)、[FAST-LIO ROS2 分支](https://github.com/hku-mars/FAST_LIO/tree/ROS2)、[选定实现与精确版本](../dependencies/README.md)。
 
 Thor GPU 首版不作为 LIO/Nav2 的必需条件；CPU 先保证导航链路。标准 MPPI 不能视为自动使用 CUDA。后续语义感知、深度处理等 GPU 任务应有独立资源预算。
 
@@ -210,6 +210,8 @@ IMU 是首版定位链路的必需输入。主惯性源为 MID-360 内置 IMU；
 | H2 状态监测 | 结合原厂状态和机身 IMU 检查姿态异常；阈值按正常步行摆动和运动模式验证 |
 
 IMU 负责短时运动信息与重力参考，不能单独消除长期位置或航向漂移；长期校正仍依靠激光地图匹配、闭环及重定位。IMU 数据超时、缺样或初始化失败时，降低估计质量并撤销相应自主运动许可，不静默切换成未经验证的纯激光模式。
+
+实现注意：当前锁定的 Livox 驱动直接发布加速度 g、角速度 rad/s，且原始 IMU 没有可直接使用的有效姿态；FAST-LIO 内部按静止加速度模长归一化。项目标准 IMU 接口必须显式处理单位、frame、姿态有效性与时间来源，避免重复换算，也不能将原始消息直接交给后端作为重力姿态。[依赖接入边界](../dependencies/README.md)
 
 ## 6. 人形机器人特有的感知与导航约束
 

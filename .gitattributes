@@ -1,0 +1,2 @@
+# Patch context preserves whitespace from the fixed upstream revision.
+dependencies/patches/*.patch -whitespace

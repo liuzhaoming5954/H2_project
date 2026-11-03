@@ -18,7 +18,7 @@ flowchart LR
 
 核心感知、定位、规划、监护和 SDK 适配都运行在 PC3；开发电脑不参与必需的实时控制闭环。SSH 用于部署与管理，不承担指令有效期或机器人失效停车机制。
 
-当前已检查到本机开发环境为 Ubuntu 24.04 / x86_64，具备 git、g++、Python、SSH 和 rsync；未发现 ROS 2、colcon、CMake 或 Docker。工程实现首先补齐 ROS 2 Jazzy 和构建工具，H2 端在首次接入时清点已有环境后再安装缺失项。
+当前本机为 Ubuntu 24.04 / x86_64，已安装 ROS 2 Jazzy、colcon、CMake、PCL 和 RTAB-Map，并验证基础工程。算法依赖使用独立工作空间，具体构建方式见 [依赖说明](../dependencies/README.md)。H2 端在首次接入时清点已有环境后再安装缺失项。
 
 ## 2. 本机验证分层
 

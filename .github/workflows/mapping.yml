@@ -7,6 +7,9 @@ on:
       - scripts/*mapping*
       - scripts/fetch_navigation_sources.sh
       - tests/ros/test_mapping_binaries.py
+      - tests/ros/test_readonly_capture.py
+      - tools/readonly_capture.py
+      - src/h2_bringup/**
       - .github/workflows/mapping.yml
   workflow_dispatch:
 
@@ -34,6 +37,11 @@ jobs:
           source /opt/ros/jazzy/setup.bash
           source install/mapping/setup.bash
           python3 tests/ros/test_mapping_binaries.py
+      - name: Check recording tools with explicitly synthetic sensor inputs
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          source install/mapping/setup.bash
+          python3 tests/ros/test_readonly_capture.py
       - name: Preserve mapping build logs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -42,5 +50,6 @@ jobs:
           path: |
             log/mapping
             artifacts/mapping-smoke
+            artifacts/readonly-capture-smoke
             vendor/actual.repos
           if-no-files-found: ignore

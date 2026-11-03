@@ -12,6 +12,7 @@ GitHub：[liuzhaoming5954/H2_project](https://github.com/liuzhaoming5954/H2_proj
 - [消息与运行契约](docs/interfaces.md)：已实现接口、会话、有效期与模拟边界。
 - [本机工具](tools/README.md)：环境检查、构建测试、源码打包和部署预览。
 - [定位建图依赖](dependencies/README.md)：固定版本的 Livox SDK2、驱动、FAST-LIO2 和 RTAB-Map，使用独立工作空间构建。
+- [第一轮 H2 只读上机测试](docs/first_hardware_test.md)：环境清单、真实网络配置、原始数据检查/录制及独立 H2 被动状态采集。
 
 首版覆盖已验收的室内平层建图、自动初定位/重定位、单点/多点导航、障碍处理、运动监护与数据记录。按范围基线实施与验收，具体依赖版本和实机参数在实现过程中收敛。
 
@@ -44,4 +45,4 @@ ros2 launch h2_bringup system.launch.py mode:=sim
 
 默认只发布静止的模拟里程计与禁用状态。运动需要显式服务使能、新鲜模拟许可及带会话/序号/原始有效期的指令；上述 smoke test 会在自己创建的图中演示这一流程和失效停车。当前不包含激光、碰撞检测、Nav2、完整步态或真实 H2 SDK，不能用于控制机器人。
 
-`mode:=replay` 只验证隔离入口，不启动运动进程，也尚未集成 LIO/地图算法。`hardware` 和 `hardware_readonly` 在本次实现中明确拒绝启动，防止将模拟能力误当成实机接入。模拟命令限制和机体高度均为测试参数，不是 H2 标定结果。
+`mode:=replay` 只验证隔离入口，不启动运动进程，也尚未集成 LIO/地图算法。`hardware_readonly` 需要显式的真实 MID-360 配置，只启动雷达采集；H2 状态由独立原生探针订阅。`hardware` 运动入口仍明确拒绝启动。模拟命令限制和机体高度均为测试参数，不是 H2 标定结果。只读模式命令和验收范围见 [首轮上机说明](docs/first_hardware_test.md)。

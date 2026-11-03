@@ -26,13 +26,21 @@ class LaunchModes(unittest.TestCase):
             env=self.environment(), capture_output=True, text=True, timeout=15)
         self.assertEqual(replay.returncode, 0, replay.stdout + replay.stderr)
         self.assertIn("no motion writer", replay.stdout)
-        for mode in ("hardware", "hardware_readonly", "invalid"):
+        for mode in ("hardware", "invalid"):
             result = subprocess.run(
                 ["ros2", "launch", "h2_bringup", "system.launch.py", f"mode:={mode}"],
                 env=self.environment(), capture_output=True, text=True, timeout=15)
             self.assertNotEqual(result.returncode, 0, mode)
-            if mode != "invalid":
+            if mode == "hardware":
                 self.assertIn("not implemented", result.stdout + result.stderr)
+
+    def test_readonly_requires_explicit_sensor_configuration(self):
+        result = subprocess.run(
+            ["ros2", "launch", "h2_bringup", "system.launch.py",
+             "mode:=hardware_readonly"],
+            env=self.environment(), capture_output=True, text=True, timeout=15)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("lidar_config", result.stdout + result.stderr)
 
     def test_sim_launch_produces_stationary_disabled_state(self):
         env = self.environment()

@@ -6,7 +6,19 @@
 
 ## 1. 代码与环境
 
-将 `codex/h2-readonly-first-test` 分支源码放到 PC3，后续命令均在仓库根目录执行。普通源码快照不包含 `vendor` 和编译产物，PC3 需要准备固定依赖并进行 ARM64 原生构建。保留原厂 BSP、JetPack 和服务；先清点环境，再安装缺少的依赖。
+在 PC3 的终端执行下面的首次克隆命令。仓库为私有仓库，需要使用有访问权限的 GitHub 账号完成认证；不要把凭据写入仓库 URL 或测试报告。首次代码/依赖下载需要 PC3 能访问 GitHub 和 Ubuntu/ROS 软件源。
+
+```bash
+git clone --branch codex/h2-readonly-first-test --single-branch \
+  https://github.com/liuzhaoming5954/H2_project.git H2_project
+cd H2_project
+git switch --detach 05eb678a70bdaa26cb6e3ca75bbb7be3b66e181c
+git rev-parse --short HEAD
+```
+
+最后应输出 `05eb678`。这是已通过本机及 GitHub CI 的首轮代码版本；后续文档补充仍在同一分支。PC3 用固定提交测试，日常开发继续在开发机完成。若 `H2_project` 目录已经存在，请先核对其内容，不要覆盖已有工作区；可选择另一个新目录克隆。不要从当前仅有初始文档的 `main` 开始部署。
+
+后续命令均在仓库根目录执行。普通源码快照不包含 `vendor` 和编译产物，PC3 需要准备固定依赖并进行 ARM64 原生构建。保留原厂 BSP、JetPack 和服务；先清点环境，再安装缺少的依赖。x86_64/CI 通过不代表 Thor/ARM64 已经验证，本轮正在验证这一项。
 
 ```bash
 mkdir -p data/first-test-001 log/readonly config/local
@@ -100,10 +112,13 @@ bash scripts/build_h2_state_probe.sh
 
 它锁定官方 SDK 提交，使用 SDK 自带 DDS 独立链接，不构建或运行上游控制示例。SDK 自带的预编译库仍需在 Thor 实际验证 ABI。构建记录在 `log/h2-state/build-summary.txt`。
 
-在**未 source ROS 且未设置 LD_LIBRARY_PATH 的新终端**进入仓库，填写 H2 状态网卡后运行：
+进入仓库，填写 H2 状态网卡后，用下面的一次性干净环境启动。即使新终端被 `.bashrc` 自动加载 ROS，这种方式也会隔离继承的 ROS、动态库和 DDS 配置，不修改终端启动文件：
 
 ```bash
-install/h2_state_probe/bin/h2_state_probe \
+env -i HOME="$HOME" USER="${USER:-$(id -un)}" \
+  PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+  LANG=C.UTF-8 LC_ALL=C.UTF-8 \
+  "$PWD/install/h2_state_probe/bin/h2_state_probe" \
   --interface REPLACE_WITH_H2_STATE_INTERFACE \
   --output "$PWD/data/first-test-001/h2-state.jsonl" \
   --duration 30 \
@@ -126,3 +141,30 @@ JSONL 保留主机接收时刻、原始 tick/模式、IMU、35 槽 motor_state�
 - 可选人工操作采集的短轨迹，明确标记与静止数据分组。
 
 第一轮通过的含义是：目标机能够构建、接收并保存这些原始数据，已检查的数据流满足采集工具的结构和连续性条件。LIO 精度、重力/机体 TF、地图定位、导航和 H2 运动停车均有各自后续验收，不由本轮数据接入结果代替。
+
+## 7. 将数据带回开发机
+
+在**开发机**仓库根目录执行，将 `PC3_USER`、`PC3_IP` 和 `/ABSOLUTE_PATH/H2_project` 替换为现场确认的值：
+
+```bash
+mkdir -p data/from-h2/first-test-001/logs
+rsync -av \
+  PC3_USER@PC3_IP:/ABSOLUTE_PATH/H2_project/data/first-test-001/ \
+  data/from-h2/first-test-001/
+rsync -av \
+  PC3_USER@PC3_IP:/ABSOLUTE_PATH/H2_project/log/readonly/ \
+  data/from-h2/first-test-001/logs/readonly/
+rsync -av \
+  PC3_USER@PC3_IP:/ABSOLUTE_PATH/H2_project/log/mapping/build-summary.txt \
+  data/from-h2/first-test-001/logs/mapping-build-summary.txt
+```
+
+如果执行了 H2 状态探针构建，再复制对应记录：
+
+```bash
+rsync -av \
+  PC3_USER@PC3_IP:/ABSOLUTE_PATH/H2_project/log/h2-state/build-summary.txt \
+  data/from-h2/first-test-001/logs/h2-state-build-summary.txt
+```
+
+这些命令不删除 PC3 原始数据。重做一次完整测试时，将说明中的 `first-test-001` 统一换成新的编号，例如 `first-test-002`；采集和报告工具会拒绝覆盖已有输出。

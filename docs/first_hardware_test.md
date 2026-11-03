@@ -152,13 +152,35 @@ JSONL 保留主机接收时刻、原始 tick/模式、IMU、35 槽 motor_state�
 
 两路状态缺失/过期、采样写入记录中的 CRC 或数值错误、输出上限等会返回非零。CRC/数值检查仅覆盖实际抽样写入的记录，不覆盖抽样间被替换的全部来流；`passed` 的范围也据此限定。输出是采集文件，不是 ROS 运动状态或 TF。
 
-## 6. 本轮结束时带回什么
+## 6. 核对 PC3 上的测试产物
 
-- PC3 环境清单和 ARM64 构建记录。
-- 实际网络配置、雷达配置和安装照片/尺寸记录。
-- 雷达 inspect 报告、静止 bag、录制日志与版本快照。
-- 如果执行了被动状态探针，其 JSONL、完整参数及退出码。
-- 可选人工操作采集的短轨迹，明确标记与静止数据分组。
+以下路径以 PC3 上的仓库根目录为起点，使用本说明中的测试编号 `first-test-001`。按步骤完成后，采集数据和相关日志分布如下。
+
+```text
+H2_project/
+├── data/first-test-001/
+│   ├── environment-before.json          # PC3 环境和网络清单
+│   ├── livox-inspect.json               # 10 秒点云和 IMU 检查报告
+│   ├── livox-stationary/
+│   │   ├── bag/
+│   │   │   ├── metadata.yaml            # 话题、消息数和录制时长
+│   │   │   └── bag_0.db3                # 点云和 IMU 的 SQLite 数据
+│   │   ├── report.json                 # 录制结果、诊断与版本信息
+│   │   ├── recorder.log                # rosbag2 录制日志
+│   │   ├── mid360-config.json           # 本次配置快照，MID-360S 沿用此文件名
+│   │   ├── navigation.repos            # 依赖版本快照
+│   │   └── build-summary.txt           # Mapping 构建记录副本，源文件存在时复制
+│   └── h2-state.jsonl                   # 可选，运行 H2 被动状态探针后生成
+├── log/
+│   ├── readonly/                       # ROS 启动及运行日志，文件名随启动变化
+│   ├── mapping/build-summary.txt        # Mapping 依赖构建记录
+│   └── h2-state/build-summary.txt       # 可选，状态探针构建记录
+└── config/local/mid360s.json             # 现场填写的采集输入
+```
+
+录制命令退出后，查看 `livox-stationary/report.json`，确认 `ok` 为 `true`。再核对 `bag/metadata.yaml` 中的 `/livox/lidar` 和 `/livox/imu`，两路消息数都应大于零。若录制器启动前就缺少一路，可能只有配置快照和失败报告。若录制中断，仍可能留下不完整的 bag。失败时也保留已生成的文件，供回传排查。
+
+回传时复制完整的 `data/first-test-001/` 和第 7 节列出的日志。安装照片、尺寸、探针运行参数和退出码需要现场另行记录。可选的人工操作轨迹应与静止数据分组保存。
 
 第一轮通过的含义是：目标机能够构建、接收并保存这些原始数据，已检查的数据流满足采集工具的结构和连续性条件。LIO 精度、重力/机体 TF、地图定位、导航和 H2 运动停车均有各自后续验收，不由本轮数据接入结果代替。
 

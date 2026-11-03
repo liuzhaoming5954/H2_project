@@ -21,6 +21,7 @@ __pycache__/
 /recordings/
 /runs/
 /artifacts/
+/vendor/
 /maps/generated/
 *.bag
 *.db3

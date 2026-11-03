@@ -1,0 +1,22 @@
+# Immutable source references. External checkouts stay outside the main src/.
+repositories:
+  fast_lio:
+    type: git
+    url: https://github.com/Ericsii/FAST_LIO_ROS2.git
+    version: 2fffc570a25d0df172720bac034fbdb6a13d2162
+  livox_ros_driver2:
+    type: git
+    url: https://github.com/Livox-SDK/livox_ros_driver2.git
+    version: 21445540f0d100dc86a7e6df312dd70bbdb4afdf
+  livox_sdk2:
+    type: git
+    url: https://github.com/Livox-SDK/Livox-SDK2.git
+    version: c0796f04c143143899c87a773d9f6b7136453c0b
+  rtabmap:
+    type: git
+    url: https://github.com/introlab/rtabmap.git
+    version: faf0ac54d2f546a51d393244973bce9363307d83
+  rtabmap_ros:
+    type: git
+    url: https://github.com/introlab/rtabmap_ros.git
+    version: cb2117f1ed6674cf7cfc644d7bb4ffc0b567b364

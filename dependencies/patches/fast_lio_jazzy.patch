@@ -1,0 +1,172 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index e091f3a..608abfb 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -5,17 +5,14 @@ if(NOT CMAKE_BUILD_TYPE)
+   set(CMAKE_BUILD_TYPE Release)
+ endif()
+ 
+- ADD_COMPILE_OPTIONS(-std=c++17) 
+- ADD_COMPILE_OPTIONS(-std=c++17) 
+- set(CMAKE_CXX_FLAGS "-std=c++17 -O3") 
+-  
+- add_definitions(-DROOT_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/\") 
+-  
+- set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fexceptions") 
+- set(CMAKE_CXX_STANDARD 17) 
++# Jazzy requires C++17; keep one standard and preserve caller compiler flags.
++set(CMAKE_CXX_STANDARD 17)
+ set(CMAKE_CXX_STANDARD_REQUIRED ON)
+ set(CMAKE_CXX_EXTENSIONS OFF)
+-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -pthread -std=c++0x -std=c++14 -fexceptions")
++
++add_definitions(-DROOT_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/\")
++set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fexceptions")
++set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -fexceptions")
+ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+ 
+ message("Current CPU archtecture: ${CMAKE_SYSTEM_PROCESSOR}")
+diff --git a/src/IMU_Processing.hpp b/src/IMU_Processing.hpp
+index f35378f..263a813 100644
+--- a/src/IMU_Processing.hpp
++++ b/src/IMU_Processing.hpp
+@@ -364,7 +364,6 @@ void ImuProcess::Process(const MeasureGroup &meas,  esekfom::esekf<state_ikfom,
+       std::cout << "IMU Initial Done" << std::endl;
+       // ROS_INFO("IMU Initial Done: Gravity: %.4f %.4f %.4f %.4f; state.bias_g: %.4f %.4f %.4f; acc covarience: %.8f %.8f %.8f; gry covarience: %.8f %.8f %.8f",\
+       //          imu_state.grav[0], imu_state.grav[1], imu_state.grav[2], mean_acc.norm(), cov_bias_gyr[0], cov_bias_gyr[1], cov_bias_gyr[2], cov_acc[0], cov_acc[1], cov_acc[2], cov_gyr[0], cov_gyr[1], cov_gyr[2]);
+-      fout_imu.open(DEBUG_FILE_DIR("imu.txt"),ios::out);
+     }
+ 
+     return;
+diff --git a/src/laserMapping.cpp b/src/laserMapping.cpp
+index d441261..60b37da 100644
+--- a/src/laserMapping.cpp
++++ b/src/laserMapping.cpp
+@@ -37,6 +37,7 @@
+ #include <math.h>
+ #include <thread>
+ #include <fstream>
++#include <stdexcept>
+ #include <csignal>
+ #include <chrono>
+ #include <unistd.h>
+@@ -631,7 +632,6 @@ void publish_odometry(const rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPt
+     odomAftMapped.child_frame_id = "body";
+     odomAftMapped.header.stamp = get_ros_time(lidar_end_time);
+     set_posestamp(odomAftMapped.pose);
+-    pubOdomAftMapped->publish(odomAftMapped);
+     auto P = kf.get_P();
+     for (int i = 0; i < 6; i ++)
+     {
+@@ -643,6 +643,7 @@ void publish_odometry(const rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPt
+         odomAftMapped.pose.covariance[i*6 + 4] = P(k, 1);
+         odomAftMapped.pose.covariance[i*6 + 5] = P(k, 2);
+     }
++    pubOdomAftMapped->publish(odomAftMapped);
+ 
+     geometry_msgs::msg::TransformStamped trans;
+     trans.header.frame_id = "camera_init";
+@@ -904,18 +905,20 @@ public:
+         kf.init_dyn_share(get_f, df_dx, df_dw, h_share_model, NUM_MAX_ITERATIONS, epsi);
+ 
+         /*** debug record ***/
+-        // FILE *fp;
+-        string pos_log_dir = root_dir + "/Log/pos_log.txt";
+-        fp = fopen(pos_log_dir.c_str(),"w");
+-
+-        // ofstream fout_pre, fout_out, fout_dbg;
+-        fout_pre.open(DEBUG_FILE_DIR("mat_pre.txt"),ios::out);
+-        fout_out.open(DEBUG_FILE_DIR("mat_out.txt"),ios::out);
+-        fout_dbg.open(DEBUG_FILE_DIR("dbg.txt"),ios::out);
+-        if (fout_pre && fout_out)
+-            cout << "~~~~"<<ROOT_DIR<<" file opened" << endl;
+-        else
+-            cout << "~~~~"<<ROOT_DIR<<" doesn't exist" << endl;
++        if (runtime_pos_log)
++        {
++            string pos_log_dir = root_dir + "/Log/pos_log.txt";
++            fp = fopen(pos_log_dir.c_str(), "w");
++            fout_pre.open(DEBUG_FILE_DIR("mat_pre.txt"), ios::out);
++            fout_out.open(DEBUG_FILE_DIR("mat_out.txt"), ios::out);
++            fout_dbg.open(DEBUG_FILE_DIR("dbg.txt"), ios::out);
++            if (!fp || !fout_pre || !fout_out || !fout_dbg)
++            {
++                if (fp) { fclose(fp); fp = nullptr; }
++                RCLCPP_FATAL(this->get_logger(), "Cannot open runtime logs under %s/Log; disable runtime_pos_log_enable or fix the directory", root_dir.c_str());
++                throw std::runtime_error("FAST-LIO runtime log initialization failed");
++            }
++        }
+ 
+         /*** ROS subscribe initialization ***/
+         if (p_pre->lidar_type == AVIA)
+@@ -949,9 +952,10 @@ public:
+ 
+     ~LaserMappingNode()
+     {
+-        fout_out.close();
+-        fout_pre.close();
+-        fclose(fp);
++        if (fout_out.is_open()) fout_out.close();
++        if (fout_pre.is_open()) fout_pre.close();
++        if (fout_dbg.is_open()) fout_dbg.close();
++        if (fp) fclose(fp);
+     }
+ 
+ private:
+@@ -1028,8 +1032,11 @@ private:
+             feats_down_world->resize(feats_down_size);
+ 
+             V3D ext_euler = SO3ToEuler(state_point.offset_R_L_I);
+-            fout_pre<<setw(20)<<Measures.lidar_beg_time - first_lidar_time<<" "<<euler_cur.transpose()<<" "<< state_point.pos.transpose()<<" "<<ext_euler.transpose() << " "<<state_point.offset_T_L_I.transpose()<< " " << state_point.vel.transpose() \
+-            <<" "<<state_point.bg.transpose()<<" "<<state_point.ba.transpose()<<" "<<state_point.grav<< endl;
++            if (runtime_pos_log)
++            {
++                fout_pre<<setw(20)<<Measures.lidar_beg_time - first_lidar_time<<" "<<euler_cur.transpose()<<" "<< state_point.pos.transpose()<<" "<<ext_euler.transpose() << " "<<state_point.offset_T_L_I.transpose()<< " " << state_point.vel.transpose() \
++                <<" "<<state_point.bg.transpose()<<" "<<state_point.ba.transpose()<<" "<<state_point.grav<< endl;
++            }
+ 
+             if(0) // If you need to see map point, change to "if(1)"
+             {
+@@ -1150,7 +1157,7 @@ private:
+     bool flg_EKF_converged, EKF_stop_flg = 0;
+     double epsi[23] = {0.001};
+ 
+-    FILE *fp;
++    FILE *fp = nullptr;
+     ofstream fout_pre, fout_out, fout_dbg;
+ };
+ 
+@@ -1160,7 +1167,16 @@ int main(int argc, char** argv)
+ 
+     signal(SIGINT, SigHandle);
+ 
+-    rclcpp::spin(std::make_shared<LaserMappingNode>());
++    try
++    {
++        rclcpp::spin(std::make_shared<LaserMappingNode>());
++    }
++    catch (const std::exception &error)
++    {
++        std::cerr << "FAST-LIO stopped: " << error.what() << std::endl;
++        rclcpp::shutdown();
++        return 1;
++    }
+ 
+     if (rclcpp::ok())
+         rclcpp::shutdown();
+@@ -1179,9 +1195,14 @@ int main(int argc, char** argv)
+     if (runtime_pos_log)
+     {
+         vector<double> t, s_vec, s_vec2, s_vec3, s_vec4, s_vec5, s_vec6, s_vec7;    
+-        FILE *fp2;
++        FILE *fp2 = nullptr;
+         string log_dir = root_dir + "/Log/fast_lio_time_log.csv";
+         fp2 = fopen(log_dir.c_str(),"w");
++        if (!fp2)
++        {
++            std::cerr << "Cannot open runtime log: " << log_dir << std::endl;
++            return 1;
++        }
+         fprintf(fp2,"time_stamp, total time, scan point size, incremental time, search time, delete size, delete time, tree size st, tree size end, add point size, preprocess time\n");
+         for (int i = 0;i<time_log_counter; i++){
+             fprintf(fp2,"%0.8f,%0.8f,%d,%0.8f,%0.8f,%d,%0.8f,%d,%d,%d,%0.8f\n",T1[i],s_plot[i],int(s_plot2[i]),s_plot3[i],s_plot4[i],int(s_plot5[i]),s_plot6[i],int(s_plot7[i]),int(s_plot8[i]), int(s_plot10[i]), s_plot11[i]);

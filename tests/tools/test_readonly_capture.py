@@ -195,11 +195,33 @@ class RecordingBoundariesTests(unittest.TestCase):
         self.assertFalse(capture.validate_bag_metadata(data, self.expected)["metadata_checks_passed"])
 
     def test_recorder_selects_only_explicit_topics_and_uses_argv(self):
-        command = capture.recorder_command(Path("/tmp/capture with spaces"), "/livox/lidar", "/livox/imu")
+        command = capture.recorder_command(Path("/tmp/capture with spaces"), "/livox/lidar", "/livox/imu", "h2_raw_recorder_123")
         self.assertEqual(command[-3:], ["--topics", "/livox/lidar", "/livox/imu"])
         self.assertIn("/tmp/capture with spaces", command)
         self.assertNotIn("--all", command)
         self.assertNotIn("--use-sim-time", command)
+        self.assertEqual(command[command.index("--node-name") + 1], "h2_raw_recorder_123")
+
+    def test_recorder_readiness_requires_its_own_two_typed_endpoints(self):
+        name = "h2_raw_recorder_123"
+        endpoints = {topic: [NS(node_name=name, topic_type=kind)]
+                     for topic, kind in self.expected.items()}
+        self.assertTrue(capture.recorder_endpoints_ready(endpoints, name, self.expected))
+
+    def test_observer_or_another_recorder_cannot_satisfy_readiness(self):
+        endpoints = {topic: [NS(node_name="h2_raw_readonly_observer_123", topic_type=kind),
+                             NS(node_name="h2_raw_recorder_456", topic_type=kind)]
+                     for topic, kind in self.expected.items()}
+        self.assertFalse(capture.recorder_endpoints_ready(endpoints, "h2_raw_recorder_123", self.expected))
+
+    def test_missing_or_wrong_type_recorder_subscription_is_not_ready(self):
+        name = "h2_raw_recorder_123"
+        endpoints = {topic: [NS(node_name=name, topic_type=kind)]
+                     for topic, kind in self.expected.items()}
+        endpoints["/livox/imu"] = [NS(node_name=name, topic_type="wrong/type")]
+        self.assertFalse(capture.recorder_endpoints_ready(endpoints, name, self.expected))
+        del endpoints["/livox/imu"]
+        self.assertFalse(capture.recorder_endpoints_ready(endpoints, name, self.expected))
 
     def test_disk_budget_boundaries_are_fail_closed(self):
         self.assertIsNone(capture.budget_reason(99, 100, 100, 100))

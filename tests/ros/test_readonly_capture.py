@@ -5,8 +5,10 @@ This verifies tool behavior and recorded bytes, not MID-360/H2 acquisition quali
 """
 
 import json
+import math
 import os
 from pathlib import Path
+import shutil
 import signal
 import sqlite3
 import subprocess
@@ -23,6 +25,7 @@ from sensor_msgs.msg import Imu
 
 
 ROOT = Path(__file__).resolve().parents[2]
+RECORDER_COLDSTART_DELAY_S = 1.5
 
 
 def process_tree(root_pid):
@@ -74,6 +77,7 @@ class SyntheticReadonlyCapture(unittest.TestCase):
         cls.config.write_text(json.dumps({
             "synthetic_fixture_only": True,
             "purpose": "capture CLI integration test; no sensor SDK is initialized",
+            "synthetic_recorder_coldstart_delay_s": RECORDER_COLDSTART_DELAY_S,
         }) + "\n")
         (cls.evidence / "fixture.json").write_text(json.dumps({
             "source": "synthetic ROS fixture; no MID-360 or H2 hardware",
@@ -81,6 +85,7 @@ class SyntheticReadonlyCapture(unittest.TestCase):
             "topics": [cls.lidar_topic, cls.imu_topic],
             "domain": updates["ROS_DOMAIN_ID"],
             "publishers": "CustomMsg and Imu only; no TF/motion/permit publishers",
+            "recorder_coldstart_delay_s": RECORDER_COLDSTART_DELAY_S,
         }, indent=2) + "\n")
         cls.context = Context()
         rclpy.init(args=[], context=cls.context)
@@ -121,17 +126,39 @@ class SyntheticReadonlyCapture(unittest.TestCase):
             cloud.points.append(point)
         cls.lidar_publisher.publish(cloud)
 
-    def run_cli(self, name, command, expected_code, *, imu_topic=None):
+    def delayed_recorder_environment(self):
+        """Delay only ros2 bag record, then exec its real absolute executable."""
+        real_ros2 = shutil.which("ros2", path=self.environment["PATH"])
+        self.assertIsNotNone(real_ros2, "ros2 is required for the recording integration test")
+        real_ros2 = str(Path(real_ros2).resolve(strict=True))
+        wrapper_directory = self.evidence / "synthetic-recorder-wrapper"
+        wrapper_directory.mkdir()
+        wrapper = wrapper_directory / "ros2"
+        wrapper.write_text(
+            f"#!{sys.executable}\n"
+            '"""Synthetic test-only recorder cold-start delay; no shell or fake recorder."""\n'
+            "import os\nimport sys\nimport time\n"
+            "if sys.argv[1:3] == ['bag', 'record']:\n"
+            f"    time.sleep({RECORDER_COLDSTART_DELAY_S!r})\n"
+            f"os.execv({real_ros2!r}, [{real_ros2!r}, *sys.argv[1:]])\n"
+        )
+        wrapper.chmod(0o700)
+        environment = self.environment.copy()
+        environment["PATH"] = str(wrapper_directory) + os.pathsep + environment["PATH"]
+        return environment
+
+    def run_cli(self, name, command, expected_code, *, imu_topic=None, environment=None):
         log = (self.evidence / f"{name}.log").open("x")
         self.log_files.append(log)
         arguments = [sys.executable, str(ROOT / "tools/readonly_capture.py"), *command,
                      "--lidar-topic", self.lidar_topic,
                      "--imu-topic", imu_topic or self.imu_topic]
         process = subprocess.Popen(
-            arguments, env=self.environment, cwd=ROOT, stdout=log,
+            arguments, env=self.environment if environment is None else environment,
+            cwd=ROOT, stdout=log,
             stderr=subprocess.STDOUT, start_new_session=True)
         self.processes.append(process)
-        deadline = time.monotonic() + 9.0
+        deadline = time.monotonic() + 16.0
         next_tree_snapshot = 0.0
         while process.poll() is None and time.monotonic() < deadline:
             self.executor.spin_once(timeout_sec=0.01)
@@ -146,6 +173,7 @@ class SyntheticReadonlyCapture(unittest.TestCase):
         # rosbag runs in a separate process group.
         remaining = [pid for pid in self.observed_descendants if Path(f"/proc/{pid}").exists()]
         self.assertEqual(remaining, [], f"capture left descendant processes: {remaining}")
+        return process.pid
 
     def test_inspect_and_record_synthetic_streams(self):
         report_path = self.evidence / "inspect.json"
@@ -157,13 +185,17 @@ class SyntheticReadonlyCapture(unittest.TestCase):
             self.assertEqual(report[stream]["frames_observed"], [self.frame])
 
         session = self.evidence / "record-session"
-        self.run_cli("record", [
-            "record", "--duration", "1.8", "--startup-timeout", "3",
+        record_pid = self.run_cli("record", [
+            "record", "--duration", "1.8", "--startup-timeout", "6",
             "--output", str(session), "--config", str(self.config),
             "--min-free-mib", "1", "--max-size-mib", "16",
-        ], 0)
+        ], 0, environment=self.delayed_recorder_environment())
         record = json.loads((session / "report.json").read_text())
         self.assertTrue(record["ok"], record)
+        self.assertIs(record["recorder_ready"], True)
+        self.assertEqual(record["recorder_node_name"], f"h2_raw_recorder_{record_pid}")
+        self.assertTrue(math.isfinite(record["recorder_ready_wait_s"]))
+        self.assertGreaterEqual(record["recorder_ready_wait_s"], RECORDER_COLDSTART_DELAY_S)
         self.assertTrue(record["bag"]["metadata_checks_passed"])
         self.assertEqual(record["recorder_exit_code"], 0)
         self.assertFalse(record["recorder_forced_cleanup"])

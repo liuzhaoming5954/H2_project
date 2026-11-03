@@ -207,9 +207,19 @@ class RawDiagnostics:
         }
 
 
-def recorder_command(output: Path, lidar_topic: str, imu_topic: str) -> list[str]:
+def recorder_command(output: Path, lidar_topic: str, imu_topic: str,
+                     node_name: str | None = None) -> list[str]:
+    node_name = node_name or "h2_raw_recorder_" + str(os.getpid())
     return ["ros2", "bag", "record", "--storage", "sqlite3", "--output", str(output),
-            "--disable-keyboard-controls", "--topics", lidar_topic, imu_topic]
+            "--disable-keyboard-controls", "--node-name", node_name,
+            "--topics", lidar_topic, imu_topic]
+
+
+def recorder_endpoints_ready(endpoints: dict, node_name: str, expected: dict[str, str]) -> bool:
+    """Check this recorder's actual DDS subscriptions, not the observer's."""
+    return bool(expected) and all(any(
+        endpoint.node_name == node_name and endpoint.topic_type == message_type
+        for endpoint in endpoints.get(topic, [])) for topic, message_type in expected.items())
 
 
 def validate_bag_metadata(metadata: dict, expected: dict[str, str]) -> dict:
@@ -261,12 +271,14 @@ def snapshot_environment(config: Path, session: Path) -> dict:
               "observer_tool_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
               "config_sha256": hashlib.sha256(data).hexdigest()}
     for key, command in (
-        ("git_head", ["git", "-C", str(ROOT), "rev-parse", "HEAD"]),
+        ("git_head", ["git", "-c", "safe.directory=" + str(ROOT), "-C", str(ROOT), "rev-parse", "HEAD"]),
         ("rtabmap_packages", ["dpkg-query", "-W", "-f=${Package}=${Version}\n", "ros-jazzy-rtabmap*"]),
     ):
         try:
             completed = subprocess.run(command, capture_output=True, text=True, timeout=5, check=False)
             result[key] = completed.stdout.strip() if completed.returncode == 0 else "unavailable"
+            if completed.returncode != 0:
+                result[key + "_error"] = completed.stderr.strip()
         except (OSError, subprocess.TimeoutExpired):
             result[key] = "unavailable"
     for name, source in (("navigation.repos", ROOT / "dependencies/navigation.repos"),
@@ -325,6 +337,20 @@ def run_observation(args) -> tuple[dict, int]:
     context = Context()
     node = executor = None
     diagnostics = RawDiagnostics(args.max_scan_span_ms)
+    next_budget_check = 0.0
+
+    def check_recording_resources():
+        nonlocal next_budget_check
+        if process is not None and process.poll() is not None:
+            raise CaptureError(f"recorder exited before duration (code {process.returncode})")
+        now = time.monotonic()
+        if session is not None and now >= next_budget_check:
+            reason = budget_reason(directory_size(session), shutil.disk_usage(session).free,
+                                   int(args.max_size_mib * MIB), int(args.min_free_mib * MIB))
+            if reason:
+                raise CaptureError(reason + "; partial data retained")
+            next_budget_check = now + 0.25
+
     if session is not None:
         if not session.is_absolute() or session.exists() or session.is_symlink():
             raise CaptureError("--output must be an absolute, new session directory")
@@ -353,29 +379,41 @@ def run_observation(args) -> tuple[dict, int]:
             deadline = time.monotonic() + args.startup_timeout
             while time.monotonic() < deadline:
                 executor.spin_once(timeout_sec=0.1)
+                check_recording_resources()
                 if diagnostics.lidar.count >= 2 and diagnostics.imu.count >= 2:
                     break
             else:
                 raise CaptureError("both raw streams were not observed before startup timeout")
-            # Inspect exactly the recording window, not just the startup samples.
-            diagnostics = RawDiagnostics(args.max_scan_span_ms)
-            command = recorder_command(session / "bag", args.lidar_topic, args.imu_topic)
+            recorder_name = "h2_raw_recorder_" + str(os.getpid())
+            command = recorder_command(session / "bag", args.lidar_topic, args.imu_topic, recorder_name)
             report["recorder_command"] = command
+            report["recorder_node_name"] = recorder_name
+            report["recorder_ready"] = False
+            report["bag_window"] = (
+                "requested duration begins after both recorder subscriptions are discovered; "
+                "the bag may also contain earlier subscription warm-up samples")
             log = (session / "recorder.log").open("x")
             process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+            ready_started = time.monotonic()
+            deadline = ready_started + args.startup_timeout
+            expected = {args.lidar_topic: "livox_ros_driver2/msg/CustomMsg",
+                        args.imu_topic: "sensor_msgs/msg/Imu"}
+            while time.monotonic() < deadline:
+                executor.spin_once(timeout_sec=0.1)
+                check_recording_resources()
+                endpoints = {topic: node.get_subscriptions_info_by_topic(topic) for topic in expected}
+                report["recorder_ready_wait_s"] = time.monotonic() - ready_started
+                if recorder_endpoints_ready(endpoints, recorder_name, expected):
+                    report["recorder_ready"] = True
+                    break
+            else:
+                raise CaptureError("recorder did not subscribe to both raw stream types before startup timeout")
+            # Diagnose the requested window, after this recorder is actually ready.
+            diagnostics = RawDiagnostics(args.max_scan_span_ms)
         started = time.monotonic()
-        next_budget_check = started
         while time.monotonic() - started < args.duration:
             executor.spin_once(timeout_sec=0.1)
-            if process is not None and process.poll() is not None:
-                raise CaptureError(f"recorder exited before duration (code {process.returncode})")
-            now = time.monotonic()
-            if session is not None and now >= next_budget_check:
-                reason = budget_reason(directory_size(session), shutil.disk_usage(session).free,
-                                       int(args.max_size_mib * MIB), int(args.min_free_mib * MIB))
-                if reason:
-                    raise CaptureError(reason + "; partial data retained")
-                next_budget_check = now + 0.25
+            check_recording_resources()
         report["completed_duration"] = True
     except KeyboardInterrupt:
         report["failure"] = "interrupted; partial data retained"

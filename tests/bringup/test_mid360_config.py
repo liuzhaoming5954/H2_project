@@ -38,6 +38,21 @@ class Mid360Configuration(unittest.TestCase):
         self.assertEqual(result, {
             "path": str(self.path), "host_ip": "192.168.31.10", "lidar_ip": "192.168.31.20"})
 
+    def test_mid360s_requires_its_own_single_host_schema(self):
+        config = json.loads((ROOT / "src/h2_bringup/config/mid360s.example.json").read_text())
+        hosts = config["Mid360s"]["host_net_info"]
+        hosts[0]["host_ip"] = "192.168.124.10"
+        config["lidar_configs"][0]["ip"] = "192.168.124.20"
+        self.assertEqual(VALIDATION.load_mid360_config(self.write(config)), {
+            "path": str(self.path), "host_ip": "192.168.124.10", "lidar_ip": "192.168.124.20"})
+
+        for invalid_hosts in ([], hosts * 2, self.config["MID360"]["host_net_info"]):
+            invalid = deepcopy(config)
+            invalid["Mid360s"]["host_net_info"] = invalid_hosts
+            self.assert_rejected(invalid)
+        config["MID360"] = self.config["MID360"]
+        self.assert_rejected(config)
+
     def test_example_placeholders_cannot_start_a_driver(self):
         with self.assertRaises(VALIDATION.Mid360ConfigError):
             VALIDATION.load_mid360_config(str(ROOT / "src/h2_bringup/config/mid360.example.json"))

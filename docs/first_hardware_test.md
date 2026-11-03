@@ -1,22 +1,22 @@
 # 第一轮 H2 只读上机测试
 
-本轮目标是确认 PC3/Thor 的构建兼容性、MID-360 原始数据和 H2 状态订阅，保存可带回开发机分析的数据。当前网络地址尚未确定，模板必须在现场填写；本文件没有预填可直接连接的机器人地址。
+本轮目标是确认 PC3/Thor 的构建兼容性、MID-360S 原始数据和 H2 状态订阅，保存可带回开发机分析的数据。在 PC3 上填写实际雷达与接收网卡地址。
 
 本轮不启动自主行走、Nav2、运动许可、H2 指令 writer 或估计器 TF。雷达采集入口只启动 Livox 驱动；独立状态探针只订阅 H2。这里的“只读”针对 H2 运动控制，Livox SDK 启动时会配置雷达输出地址和数据格式。
 
 ## 1. 代码与环境
 
-在 PC3 的终端执行下面的首次克隆命令。仓库为私有仓库，需要使用有访问权限的 GitHub 账号完成认证；不要把凭据写入仓库 URL 或测试报告。首次代码/依赖下载需要 PC3 能访问 GitHub 和 Ubuntu/ROS 软件源。
+在 PC3 的终端执行下面的首次克隆命令。仓库已公开，可通过 HTTPS 匿名克隆。首次下载代码和依赖需要 PC3 能访问 GitHub 和 Ubuntu/ROS 软件源。
 
 ```bash
 git clone --branch codex/h2-readonly-first-test --single-branch \
   https://github.com/liuzhaoming5954/H2_project.git H2_project
 cd H2_project
-git switch --detach 05eb678a70bdaa26cb6e3ca75bbb7be3b66e181c
-git rev-parse --short HEAD
+git rev-parse HEAD
+test -f src/h2_bringup/config/mid360s.example.json
 ```
 
-最后应输出 `05eb678`。这是已通过本机及 GitHub CI 的首轮代码版本；后续文档补充仍在同一分支。PC3 用固定提交测试，日常开发继续在开发机完成。若 `H2_project` 目录已经存在，请先核对其内容，不要覆盖已有工作区；可选择另一个新目录克隆。不要从当前仅有初始文档的 `main` 开始部署。
+记录输出的提交 SHA，便于复现实机结果。部署版本须包含 `src/h2_bringup/config/mid360s.example.json` 和对应的启动校验。此前的 `05eb678` 只接受普通 MID-360 配置。已有工作区时，先用 `git status --short` 检查本地改动。确认工作区干净后，可执行 `git fetch origin refs/heads/codex/h2-readonly-first-test` 和 `git switch --detach FETCH_HEAD` 切到刚下载的版本，再记录 SHA 和执行模板检查。更新后执行下方的构建检查，以刷新已安装的启动文件。若模板检查失败，先核对分支与提交。
 
 后续命令均在仓库根目录执行。普通源码快照不包含 `vendor` 和编译产物，PC3 需要准备固定依赖并进行 ARM64 原生构建。保留原厂 BSP、JetPack 和服务；先清点环境，再安装缺少的依赖。x86_64/CI 通过不代表 Thor/ARM64 已经验证，本轮正在验证这一项。
 
@@ -29,7 +29,7 @@ ip route
 
 环境报告包含架构、内核、NVIDIA 包、工作区剩余磁盘、ROS 工具和网卡地址。生成报告不代表验收通过；确认 `target_arm64=true`，并检查 `ros_prerequisites`。如果此终端尚未 source Jazzy，先保留原始清单，加载环境后再运行 doctor。
 
-现场填写：SSH 地址/用户名、MID-360 IP、PC3 雷达网卡 IP，以及用于订阅 H2 内部 DDS 的网卡名。雷达网卡和 H2 状态网卡可能不同，不能从示例地址推定。本轮工具只读取网卡清单，不自动更改网络。
+现场记录 PC3 雷达网卡 IP、用于回传数据的 SSH 地址和用户名，以及可选的 H2 内部 DDS 网卡名。雷达网卡和 H2 状态网卡可能不同，不能从示例地址推定。本轮工具只读取网卡清单，不自动更改网络。
 
 缺少 Jazzy 时使用 `bash scripts/install_ros_jazzy.sh`；确认缺少定位依赖后使用 `bash scripts/install_mapping_dependencies.sh`。安装需要终端交互 sudo，脚本不接收密码。随后执行：
 
@@ -43,13 +43,33 @@ python3 tools/h2ctl.py check --profile ros --jobs 2
 
 `check` 中的运动测试使用独立 ROS 域和 mock，仍是模拟接口检查，不代表 H2 运动接口验证。依赖构建证据在 `log/mapping/build-summary.txt`。首次上机须确认 `architecture=aarch64`，不能复制开发机的 x86_64 库到 Thor 使用。
 
-## 2. 填写 MID-360 配置
+## 2. 填写 MID-360S 配置
 
 ```bash
-cp -n src/h2_bringup/config/mid360.example.json config/local/mid360.json
+cp -n src/h2_bringup/config/mid360s.example.json config/local/mid360s.json
 ```
 
-编辑本地 JSON，将所有 `REPLACE_WITH_PC3_SENSOR_IPV4` 替换为 PC3 雷达网卡的实际 IPv4，将 `REPLACE_WITH_MID360_IPV4` 替换为雷达实际 IPv4。两者必须不同；原始点云保留零 SDK 外参，安装外参由后续标定处理。模板占位、无效地址、多雷达、非零 SDK 外参或错误端口会被启动入口拒绝。配置格式验证不能证明地址可达、网卡绑定正确或时间同步成功。
+在 PC3 输入雷达标签或现场记录里的固定 IPv4，然后查看 PC3 的出接口和源地址：
+
+```bash
+read -r -p 'MID-360S 固定 IPv4: ' h2_lidar_ipv4
+ip route get "$h2_lidar_ipv4"
+```
+
+确认 `dev` 是接雷达的网卡，`src` 是该网卡的实际 IPv4。若选到了默认路由或其他网卡，先核对 PC3 雷达网口的地址、掩码和物理连接。用编辑器打开 `config/local/mid360s.json`，填写以下字段：
+
+| JSON 字段 | 填写值 |
+| --- | --- |
+| `lidar_configs[0].ip` | MID-360S 固定 IPv4 |
+| `Mid360s.host_net_info[0].host_ip` | PC3 雷达网卡 IPv4，即已确认的 `src` |
+
+保持 `Mid360s` 的大小写、`host_net_info` 的单元素数组结构、模板端口、`lidar_type: 8` 和零 SDK 外参。雷达和 PC3 地址必须不同。可在启动前做一次离线校验：
+
+```bash
+PYTHONPATH="$PWD/src/h2_bringup/launch" python3 -c \
+  'import sys; from mid360_config import load_mid360_config; print(load_mid360_config(sys.argv[1]))' \
+  "$PWD/config/local/mid360s.json"
+```
 
 本地配置位于忽略目录 `config/local`，原始数据位于忽略目录 `data`，不直接提交到团队源码仓库。
 
@@ -67,7 +87,7 @@ export ROS_STATIC_PEERS=''
 export ROS_LOG_DIR="$PWD/log/readonly"
 ros2 launch h2_bringup system.launch.py \
   mode:=hardware_readonly \
-  lidar_config:="$PWD/config/local/mid360.json"
+  lidar_config:="$PWD/config/local/mid360s.json"
 ```
 
 入口只加载 `livox_ros_driver2_node`，不加载 mock、supervisor、motion_guard、Unitree 控制客户端或 TF 发布器。原始话题为 `/livox/lidar`（CustomMsg）和 `/livox/imu`（Imu），frame 保留 `livox_frame`。按 Ctrl-C 结束采集驱动。
@@ -76,7 +96,7 @@ ros2 launch h2_bringup system.launch.py \
 
 ## 4. 检查真实数据并录制
 
-另开 PC3 ROS 终端，重复上一节 source 和四个 export 后执行：
+另开 PC3 ROS 终端，进入同一仓库根目录，重复上一节 source 和四个 export 后执行：
 
 ```bash
 python3 tools/readonly_capture.py inspect \
@@ -86,7 +106,7 @@ python3 tools/readonly_capture.py inspect \
 python3 tools/readonly_capture.py record \
   --duration 30 \
   --output "$PWD/data/first-test-001/livox-stationary" \
-  --config "$PWD/config/local/mid360.json" \
+  --config "$PWD/config/local/mid360s.json" \
   --max-size-mib 512 \
   --min-free-mib 2048
 ```

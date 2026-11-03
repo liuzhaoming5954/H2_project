@@ -40,7 +40,7 @@ def launch_mode(context):
         sensors_launch = str(Path(get_package_share_directory("h2_bringup")) /
                              "launch/sensors_readonly.launch.py")
         return isolation + [
-            LogInfo(msg=("First hardware test: MID-360 acquisition only. "
+            LogInfo(msg=("First hardware test: Livox acquisition only. "
                          "H2 state collection uses the separate passive SDK probe.")),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(sensors_launch),

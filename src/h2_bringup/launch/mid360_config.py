@@ -1,4 +1,4 @@
-"""Validate the intentionally narrow, single MID-360 first-test configuration.
+"""Validate the intentionally narrow, single MID-360 family first-test configuration.
 
 This module uses only the Python standard library and never opens a network
 socket. Validation proves configuration shape, not sensor connectivity or time
@@ -77,7 +77,7 @@ def validate_domain_id(value):
 def load_mid360_config(config_path):
     """Validate an explicit absolute file and return its path/address summary.
 
-    Raw sensor geometry is retained: only MID-360 Cartesian data, its normal
+    Raw sensor geometry is retained: only Livox Cartesian data, its normal
     non-repetitive pattern and zero SDK extrinsics are accepted. Mounting and
     LiDAR/IMU transforms belong to the later project calibration/TF adapter.
     """
@@ -98,41 +98,55 @@ def load_mid360_config(config_path):
     except (OSError, UnicodeError, json.JSONDecodeError) as error:
         raise Mid360ConfigError(f"Cannot read MID-360 JSON configuration: {error}") from error
 
-    _object(config, "configuration", ("lidar_summary_info", "MID360", "lidar_configs"))
+    model_keys = {"MID360", "Mid360s"}.intersection(config) if isinstance(config, dict) else set()
+    if len(model_keys) != 1:
+        raise Mid360ConfigError("Configuration requires exactly one device key: MID360 or Mid360s")
+    model_key = model_keys.pop()
+    _object(config, "configuration", ("lidar_summary_info", model_key, "lidar_configs"))
     summary = _object(config["lidar_summary_info"], "lidar_summary_info", ("lidar_type",))
     if type(summary["lidar_type"]) is not int or summary["lidar_type"] != 8:
-        raise Mid360ConfigError("lidar_summary_info.lidar_type must be 8 (MID-360)")
-    mid360 = _object(config["MID360"], "MID360", ("lidar_net_info", "host_net_info"))
-    lidar_net = _object(mid360["lidar_net_info"], "MID360.lidar_net_info",
-                        tuple(f"{name}_port" for name in PORT_NAMES))
-    host_net = _object(mid360["host_net_info"], "MID360.host_net_info",
-                       tuple(field for name in PORT_NAMES
-                             for field in (f"{name}_ip", f"{name}_port")))
-    _ports(lidar_net, "MID360.lidar_net_info")
-    _ports(host_net, "MID360.host_net_info")
-    host_addresses = [
-        _ipv4(host_net[f"{name}_ip"], f"MID360.host_net_info.{name}_ip")
-        for name in PORT_NAMES if name != "log_data"
-    ]
-    if len(set(host_addresses)) != 1:
-        raise Mid360ConfigError("All host stream addresses must select the same PC3 IPv4 address")
-    host_ip = host_addresses[0]
-    log_ip = host_net["log_data_ip"]
-    if log_ip != "" and _ipv4(log_ip, "MID360.host_net_info.log_data_ip") != host_ip:
-        raise Mid360ConfigError("log_data_ip must be empty or equal to the PC3 host address")
+        raise Mid360ConfigError("lidar_summary_info.lidar_type must be 8 (Livox protocol)")
+    model = _object(config[model_key], model_key, ("lidar_net_info", "host_net_info"))
+    port_fields = tuple(f"{name}_port" for name in PORT_NAMES)
+    lidar_label = f"{model_key}.lidar_net_info"
+    lidar_net = _object(model["lidar_net_info"], lidar_label, port_fields)
+    _ports(lidar_net, lidar_label)
+    host_label = f"{model_key}.host_net_info"
+    if model_key == "Mid360s":
+        hosts = model["host_net_info"]
+        if not isinstance(hosts, list) or len(hosts) != 1:
+            raise Mid360ConfigError(f"{host_label}: expected a single PC3 host entry")
+        host_label += "[0]"
+        host_net = _object(hosts[0], host_label, ("host_ip", *port_fields))
+        host_ip = _ipv4(host_net["host_ip"], f"{host_label}.host_ip")
+    else:
+        host_net = _object(model["host_net_info"], host_label,
+                           tuple(field for name in PORT_NAMES
+                                 for field in (f"{name}_ip", f"{name}_port")))
+        host_addresses = [
+            _ipv4(host_net[f"{name}_ip"], f"{host_label}.{name}_ip")
+            for name in PORT_NAMES if name != "log_data"
+        ]
+        if len(set(host_addresses)) != 1:
+            raise Mid360ConfigError("All host stream addresses must select the same PC3 IPv4 address")
+        host_ip = host_addresses[0]
+        log_ip = host_net["log_data_ip"]
+        if log_ip != "" and _ipv4(log_ip, f"{host_label}.log_data_ip") != host_ip:
+            raise Mid360ConfigError("log_data_ip must be empty or equal to the PC3 host address")
+    _ports(host_net, host_label)
 
     devices = config["lidar_configs"]
     if not isinstance(devices, list) or len(devices) != 1:
-        raise Mid360ConfigError("First sensor test requires exactly one MID-360 in lidar_configs")
+        raise Mid360ConfigError("First sensor test requires exactly one sensor in lidar_configs")
     device = _object(devices[0], "lidar_configs[0]",
                      ("ip", "pcl_data_type", "pattern_mode", "extrinsic_parameter"))
     lidar_ip = _ipv4(device["ip"], "lidar_configs[0].ip")
     if lidar_ip == host_ip:
-        raise Mid360ConfigError("MID-360 and PC3 host IPv4 addresses must differ")
+        raise Mid360ConfigError("LiDAR and PC3 host IPv4 addresses must differ")
     if type(device["pcl_data_type"]) is not int or device["pcl_data_type"] != 1:
         raise Mid360ConfigError("pcl_data_type must be 1 for the selected raw Cartesian format")
     if type(device["pattern_mode"]) is not int or device["pattern_mode"] != 0:
-        raise Mid360ConfigError("pattern_mode must remain 0 for the first MID-360 test")
+        raise Mid360ConfigError("pattern_mode must remain 0 for the first sensor test")
     extrinsics = _object(device["extrinsic_parameter"], "extrinsic_parameter",
                          ("roll", "pitch", "yaw", "x", "y", "z"))
     for name, value in extrinsics.items():

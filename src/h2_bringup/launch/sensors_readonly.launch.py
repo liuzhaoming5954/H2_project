@@ -1,4 +1,4 @@
-"""MID-360 capture only: no H2 command writer, estimator, TF or mock state."""
+"""MID-360/MID-360S capture only: no H2 command writer, estimator, TF or mock state."""
 
 import importlib.util
 from pathlib import Path
@@ -24,7 +24,7 @@ def _unexpected_driver_exit(event, context):
         return []
     # Let LaunchService report an error and shut down the remaining actions.
     # A driver that exits immediately must not look like a successful capture.
-    raise RuntimeError(f"MID-360 driver exited unexpectedly with code {event.returncode}")
+    raise RuntimeError(f"Livox driver exited unexpectedly with code {event.returncode}")
 
 
 def start_sensor(context):
@@ -54,7 +54,7 @@ def start_sensor(context):
         SetEnvironmentVariable("ROS_AUTOMATIC_DISCOVERY_RANGE", "LOCALHOST"),
         SetEnvironmentVariable("ROS_STATIC_PEERS", ""),
         LogInfo(msg=(
-            f"MID-360 sensor capture: host={config['host_ip']}, lidar={config['lidar_ip']}, "
+            f"Livox sensor capture: host={config['host_ip']}, lidar={config['lidar_ip']}, "
             f"ROS domain={domain}. Publishes raw /livox/lidar and /livox/imu only. "
             "Livox SDK configures sensor output; no H2 command writer is launched. "
             "Process liveness alone does not prove valid sensor data."
@@ -68,7 +68,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             "lidar_config", default_value="",
-            description="Explicit absolute path to the reviewed single MID-360 JSON configuration"),
+            description="Explicit absolute path to the reviewed single MID-360/MID-360S JSON configuration"),
         DeclareLaunchArgument(
             "ros_domain_id", default_value="81",
             description="ROS sensor-capture domain, separate from the default mock domain 71"),

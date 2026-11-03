@@ -45,4 +45,4 @@ ros2 launch h2_bringup system.launch.py mode:=sim
 
 默认只发布静止的模拟里程计与禁用状态。运动需要显式服务使能、新鲜模拟许可及带会话/序号/原始有效期的指令；上述 smoke test 会在自己创建的图中演示这一流程和失效停车。当前不包含激光、碰撞检测、Nav2、完整步态或真实 H2 SDK，不能用于控制机器人。
 
-`mode:=replay` 只验证隔离入口，不启动运动进程，也尚未集成 LIO/地图算法。`hardware_readonly` 需要显式的真实 MID-360 配置，只启动雷达采集；H2 状态由独立原生探针订阅。`hardware` 运动入口仍明确拒绝启动。模拟命令限制和机体高度均为测试参数，不是 H2 标定结果。只读模式命令和验收范围见 [首轮上机说明](docs/first_hardware_test.md)。
+`mode:=replay` 只验证隔离入口，不启动运动进程，也尚未集成 LIO/地图算法。`hardware_readonly` 需要显式的 MID-360 或 MID-360S 实机配置，只启动雷达采集；H2 状态由独立原生探针订阅。`hardware` 运动入口仍明确拒绝启动。模拟命令限制和机体高度均为测试参数，不是 H2 标定结果。只读模式命令和验收范围见 [首轮上机说明](docs/first_hardware_test.md)。

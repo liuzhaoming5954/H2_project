@@ -1,6 +1,9 @@
-# Optional passive H2 state probe; kept separate from the ROS workspace.
-repositories:
-  unitree_sdk2:
-    type: git
-    url: https://github.com/unitreerobotics/unitree_sdk2.git
-    version: 8e1b927586712edd6a4c29d50dd52dff1e163439
+{
+  "repositories": {
+    "unitree_sdk2": {
+      "type": "git",
+      "url": "https://github.com/unitreerobotics/unitree_sdk2.git",
+      "version": "8e1b927586712edd6a4c29d50dd52dff1e163439"
+    }
+  }
+}

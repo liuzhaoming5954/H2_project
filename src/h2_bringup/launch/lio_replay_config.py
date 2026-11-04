@@ -7,6 +7,9 @@ import yaml
 
 
 REPLAY_NAMESPACE = "/h2_lio_replay"
+# FAST-LIO uses p_IMU = R_IMU_LiDAR * p_LiDAR + t_IMU_LiDAR, in meters.
+# Mid-360S manual v1.0, IMU Data section, gives the opposite origin position.
+MID360S_NOMINAL_TRANSLATION = [-0.011, -0.02329, 0.04412]
 
 
 class LioReplayConfigError(ValueError):
@@ -15,9 +18,6 @@ class LioReplayConfigError(ValueError):
 
 def load_lio_replay_config(config_path, allow_experimental_extrinsics=False):
     """Read a replay-only configuration and reject invalid map dimensions."""
-    if allow_experimental_extrinsics is not True:
-        raise LioReplayConfigError(
-            "Set allow_experimental_extrinsics:=true to use the uncalibrated identity extrinsics")
     path = Path(config_path)
     if not path.is_absolute():
         raise LioReplayConfigError("params_file must be an absolute path")
@@ -55,7 +55,6 @@ def load_lio_replay_config(config_path, allow_experimental_extrinsics=False):
         "preprocess.lidar_type": 1,
         "preprocess.scan_line": 4,
         "mapping.extrinsic_est_en": False,
-        "mapping.extrinsic_T": [0.0, 0.0, 0.0],
         "mapping.extrinsic_R": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
         "runtime_pos_log_enable": False,
         "pcd_save.pcd_save_en": False,
@@ -64,4 +63,16 @@ def load_lio_replay_config(config_path, allow_experimental_extrinsics=False):
         value = parameters.get(name)
         if value != expected or type(value) is not type(expected):
             raise LioReplayConfigError(f"{name} must remain {expected!r} for this replay entry")
+    translation = parameters.get("mapping.extrinsic_T")
+    if (not isinstance(translation, list) or len(translation) != 3
+            or any(type(value) not in (int, float) or not math.isfinite(value)
+                   for value in translation)):
+        raise LioReplayConfigError("mapping.extrinsic_T must contain three finite numbers in meters")
+    if translation == [0.0, 0.0, 0.0]:
+        if allow_experimental_extrinsics is not True:
+            raise LioReplayConfigError(
+                "Set allow_experimental_extrinsics:=true to use the uncalibrated identity extrinsics")
+    elif translation != MID360S_NOMINAL_TRANSLATION:
+        raise LioReplayConfigError(
+            "mapping.extrinsic_T must use the Mid-360S manual nominal translation or experimental zero")
     return parameters

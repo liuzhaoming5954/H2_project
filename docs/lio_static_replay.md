@@ -65,3 +65,5 @@ ros2 bag play "$PWD/data/from-h2/first-test-001/livox-stationary-retry-01/bag" \
 ## 本次数据的本地结果
 
 开发机回传目录 `data/from-h2/first-test-001/analysis/fastlio-static-003/` 保存正确参数回放的 `report.json`、`parameters.yaml`、`odometry.csv`、节点日志、末帧点云与内部状态日志。`fastlio-static-002/` 保留错误参数的对照。通过新增项目入口的完整复测记录在 `analysis/fastlio-static-004/`，消息计数和位置变化与修正参数后的直接回放相同。修复前后的轨迹图位于 `analysis/static_replay_comparison.png`。
+
+准备采用厂家内部几何值或测量 H2 安装外参时，按[外参准备与验证](extrinsic_calibration.md)选择对应配置和测量流程。

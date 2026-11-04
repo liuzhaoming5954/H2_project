@@ -12,6 +12,7 @@ GitHub：[liuzhaoming5954/H2_project](https://github.com/liuzhaoming5954/H2_proj
 - [消息与运行契约](docs/interfaces.md)：已实现接口、会话、有效期与模拟边界。
 - [本机工具](tools/README.md)：环境检查、构建测试、源码打包和部署预览。
 - [定位建图依赖](dependencies/README.md)：固定版本的 Livox SDK2、驱动、FAST-LIO2 和 RTAB-Map，使用独立工作空间构建。
+- [外参准备与验证](docs/extrinsic_calibration.md)
 - [MID-360S 静态 LIO 回放](docs/lio_static_replay.md)
 - [第一次上机逐步操作教程](docs/first_hardware_test_tutorial.md)
 - [第一轮 H2 只读上机测试](docs/first_hardware_test.md)：环境清单、真实网络配置、原始数据检查/录制及独立 H2 被动状态采集。

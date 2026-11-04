@@ -1,4 +1,4 @@
-"""Start FAST-LIO for a local static bag experiment with fixed experimental extrinsics."""
+"""Start local FAST-LIO replay with explicit experimental or factory nominal extrinsics."""
 
 import importlib.util
 from pathlib import Path
@@ -19,12 +19,16 @@ def start_replay(context):
     allowed = LaunchConfiguration("allow_experimental_extrinsics").perform(context) == "true"
     parameters = validation.load_lio_replay_config(params_file, allowed)
     namespace = validation.REPLAY_NAMESPACE
+    if parameters["mapping.extrinsic_T"] == validation.MID360S_NOMINAL_TRANSLATION:
+        extrinsics_description = "Mid-360S factory nominal extrinsics, without independent calibration"
+    else:
+        extrinsics_description = "experimental identity extrinsics"
     return [
         SetEnvironmentVariable("ROS_DOMAIN_ID", "167"),
         SetEnvironmentVariable("ROS_AUTOMATIC_DISCOVERY_RANGE", "LOCALHOST"),
         SetEnvironmentVariable("ROS_STATIC_PEERS", ""),
         LogInfo(msg=(
-            "FAST-LIO static replay uses ROS domain 167 and experimental identity extrinsics. "
+            f"FAST-LIO static replay uses ROS domain 167 and {extrinsics_description}. "
             "Outputs retain native camera_init/body frames."
         )),
         Node(

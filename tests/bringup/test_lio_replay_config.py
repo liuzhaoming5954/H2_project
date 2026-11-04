@@ -51,6 +51,22 @@ class LioReplayConfiguration(unittest.TestCase):
         with self.assertRaisesRegex(VALIDATION.LioReplayConfigError, "allow_experimental"):
             VALIDATION.load_lio_replay_config(self.write())
 
+    def test_mid360s_manual_nominal_config_uses_inverse_translation_in_meters(self):
+        config_path = ROOT / "src/h2_bringup/config/fastlio_mid360s_nominal.yaml"
+        parameters = VALIDATION.load_lio_replay_config(str(config_path))
+        self.assertEqual(parameters["mapping.extrinsic_T"], [-0.011, -0.02329, 0.04412])
+        self.assertEqual(parameters["mapping.extrinsic_R"],
+                         [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0])
+        self.assertFalse(parameters["mapping.extrinsic_est_en"])
+
+    def test_unknown_translation_is_rejected_even_with_experimental_opt_in(self):
+        for translation in ([0.011, 0.02329, -0.04412], [-11.0, -23.29, 44.12],
+                            [0.01, 0.0, 0.0], [False, 0.0, 0.0], [float("nan"), 0.0, 0.0]):
+            with self.subTest(translation=translation):
+                self.parameters["mapping.extrinsic_T"] = translation
+                with self.assertRaises(VALIDATION.LioReplayConfigError):
+                    VALIDATION.load_lio_replay_config(self.write(), True)
+
     def test_extrinsic_estimation_and_input_topics_remain_fixed(self):
         self.parameters["mapping.extrinsic_est_en"] = True
         with self.assertRaises(VALIDATION.LioReplayConfigError):

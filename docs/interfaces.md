@@ -10,7 +10,7 @@
 | `h2_core` | 无 ROS 依赖的 C++17 指令/许可/会话与限幅核心 |
 | `h2_runtime` | C++ `motion_guard` 与 `mock_platform`，均未加载 SDK |
 | `h2_supervisor` | Python `supervisor`；只实现模拟健康策略，hardware 模式不发有效许可 |
-| `h2_bringup` | sim/replay 入口；hardware/hardware_readonly 尚未接入且明确拒绝 |
+| `h2_bringup` | sim/replay 入口；hardware_readonly 显式配置 MID-360 采集，hardware 运动入口仍拒绝 |
 
 ## ROS 接口
 
@@ -48,3 +48,9 @@ sim.yaml 当前前进上限 0.2 m/s、转向上限 0.3 rad/s、guard 最大指�
 sim 启动 mock、guard 和模拟 supervisor，默认无运动；不包含真实雷达、LIO、障碍物或步态。replay 本次只保留不加载运动进程的隔离入口，真实 bag 选择、算法链与时间控制在后续实现。
 
 单个运行图中每条 TF 仅有一个发布者；真实估计链接入后，不允许同时保留 mock 的同名 odom/TF。模拟/回放与硬件模式不共用 SDK writer。
+
+## 首轮只读硬件接口
+
+`hardware_readonly` 默认 domain 81、LOCALHOST，必须提供 `lidar_config` 绝对路径；只启动 Livox 驱动，保留 `/livox/lidar` CustomMsg、`/livox/imu` Imu 与原始 `livox_frame`。原始 IMU 加速度为 g、角速度为 rad/s，姿态有效性及时间同步没有由本轮启动证明。该模式不发布项目 odom/TF、motion command/permit 或模拟状态。
+
+独立的 `h2_state_probe` 使用官方 SDK 自带 DDS/domain 0，只被动订阅 `rt/lowstate` 和可选 `rt/secondary_imu`，将原始字段保存为 JSONL，不加入 ROS 图或创建运动客户端。两套 DDS 的库和环境保持进程隔离；完整命令、输出与限定见 [首轮上机说明](first_hardware_test.md)。

@@ -27,5 +27,6 @@ printf 'RTAB-Map version selections:\n%s\n' "${h2_pinned[@]}"
   build-essential cmake git pkg-config python3-vcstool python3-yaml \
   python3-colcon-common-extensions libpcl-dev libeigen3-dev python3-dev \
   ros-jazzy-ament-cmake-auto ros-jazzy-pcl-ros ros-jazzy-pcl-conversions ros-jazzy-common-interfaces \
+  ros-jazzy-rosbag2 ros-jazzy-rosbag2-storage-default-plugins \
   "${h2_pinned[@]}"
 echo 'Installed mapping prerequisites only; LIO still requires a source build and validation.'

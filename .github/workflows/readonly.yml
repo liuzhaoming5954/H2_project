@@ -1,0 +1,39 @@
+name: Passive H2 state probe build
+
+on:
+  pull_request:
+    paths:
+      - tools/h2_state_probe/**
+      - scripts/*h2_state*
+      - dependencies/h2_state.repos
+      - .github/workflows/readonly.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-sdk-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install native build and source tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake git
+      - name: Fetch fixed SDK and build passive subscriber
+        run: |
+          bash scripts/fetch_h2_state_source.sh
+          bash scripts/build_h2_state_probe.sh
+      - name: Check help without creating a DDS participant
+        run: install/h2_state_probe/bin/h2_state_probe --help
+      - name: Preserve native build record
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: h2-passive-probe-build
+          path: |
+            log/h2-state
+            vendor/h2-state-actual.repos
+          if-no-files-found: ignore

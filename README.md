@@ -1,10 +1,10 @@
 # H2 自主定位导航
 
-目标平台：宇树 H2、MID-360（含内置 IMU）、PC3 NVIDIA Thor、Ubuntu 24.04 / ROS 2 Jazzy。
+目标平台：宇树 H2、MID-360S（含内置 IMU）、PC3 NVIDIA Thor、Ubuntu 24.04 / ROS 2 Jazzy。
 
 GitHub：[liuzhaoming5954/H2_project](https://github.com/liuzhaoming5954/H2_project)。主分支为 `main`，团队使用功能/修复分支提交 PR；协作约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-当前已实现并在 x86_64 / ROS 2 Jazzy 验证运动监护基础工程：5 个 ROS 包、公共消息、默认禁用的指令闸门、独立模拟监护、理想运动平台与构建工具。完整首版导航功能尚未完成，未做 Thor/H2 实机验收；进度见 [实现状态](docs/implementation_status.md)。
+当前已实现并在 x86_64 / ROS 2 Jazzy 验证运动监护基础工程：5 个 ROS 包、公共消息、默认禁用的指令闸门、独立模拟监护、理想运动平台与构建工具。完整首版导航功能尚未完成，MID-360S 原始采集已有实机证据，自主导航实机验收待完成；进度见 [实现状态](docs/implementation_status.md)。
 
 - [首版功能范围基线 V1.0](docs/v1_scope.md)：必交付能力、运行边界、失败/恢复行为、排除项和完成条件。
 - [软件总体架构 V0.4](docs/software_architecture.md)：模块职责、数据流、坐标系、算法与部署原则。
@@ -12,6 +12,7 @@ GitHub：[liuzhaoming5954/H2_project](https://github.com/liuzhaoming5954/H2_proj
 - [消息与运行契约](docs/interfaces.md)：已实现接口、会话、有效期与模拟边界。
 - [本机工具](tools/README.md)：环境检查、构建测试、源码打包和部署预览。
 - [定位建图依赖](dependencies/README.md)：固定版本的 Livox SDK2、驱动、FAST-LIO2 和 RTAB-Map，使用独立工作空间构建。
+- [MID-360S 静态 LIO 回放](docs/lio_static_replay.md)
 - [第一次上机逐步操作教程](docs/first_hardware_test_tutorial.md)
 - [第一轮 H2 只读上机测试](docs/first_hardware_test.md)：环境清单、真实网络配置、原始数据检查/录制及独立 H2 被动状态采集。
 

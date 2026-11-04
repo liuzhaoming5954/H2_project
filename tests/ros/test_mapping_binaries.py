@@ -103,6 +103,8 @@ class MappingBinarySmoke(unittest.TestCase):
             "preprocess.scan_rate": 10,
             "feature_extract_enable": False,
             "point_filter_num": 3,
+            "cube_side_length": 1000.0,
+            "mapping.det_range": 100.0,
             "mapping.extrinsic_est_en": False,
             "mapping.extrinsic_T": [0.0, 0.0, 0.0],
             "mapping.extrinsic_R": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
@@ -243,6 +245,9 @@ class MappingBinarySmoke(unittest.TestCase):
             elif isinstance(wanted, int):
                 self.assertEqual(value.type, ParameterType.PARAMETER_INTEGER, key)
                 actual[key] = value.integer_value
+            elif isinstance(wanted, float):
+                self.assertEqual(value.type, ParameterType.PARAMETER_DOUBLE, key)
+                actual[key] = value.double_value
             elif isinstance(wanted, str):
                 self.assertEqual(value.type, ParameterType.PARAMETER_STRING, key)
                 actual[key] = value.string_value
@@ -278,6 +283,8 @@ class MappingBinarySmoke(unittest.TestCase):
 
         self.effective_parameters("fastlio", {
             "preprocess.lidar_type": 1,
+            "cube_side_length": 1000.0,
+            "mapping.det_range": 100.0,
             "common.lid_topic": self.topics["raw_points"],
             "common.imu_topic": self.topics["raw_imu"],
             "runtime_pos_log_enable": False,

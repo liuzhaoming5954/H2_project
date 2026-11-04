@@ -1,0 +1,37 @@
+# Local static replay experiment. Identity extrinsics require explicit opt-in.
+/**:
+  ros__parameters:
+    use_sim_time: false
+    common.lid_topic: /h2_lio_replay/raw_lidar
+    common.imu_topic: /h2_lio_replay/raw_imu
+    common.time_sync_en: false
+    common.time_offset_lidar_to_imu: 0.0
+    preprocess.lidar_type: 1
+    preprocess.scan_line: 4
+    preprocess.timestamp_unit: 3
+    preprocess.scan_rate: 10
+    preprocess.blind: 0.5
+    feature_extract_enable: false
+    point_filter_num: 3
+    max_iteration: 3
+    filter_size_surf: 0.5
+    filter_size_map: 0.5
+    # Must exceed 3 * mapping.det_range for the pinned moving-map implementation.
+    cube_side_length: 1000.0
+    mapping.det_range: 100.0
+    mapping.fov_degree: 360.0
+    mapping.gyr_cov: 0.1
+    mapping.acc_cov: 0.1
+    mapping.b_gyr_cov: 0.0001
+    mapping.b_acc_cov: 0.0001
+    mapping.extrinsic_est_en: false
+    mapping.extrinsic_T: [0.0, 0.0, 0.0]
+    mapping.extrinsic_R: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+    runtime_pos_log_enable: false
+    pcd_save.pcd_save_en: false
+    publish.path_en: false
+    publish.map_en: false
+    publish.effect_map_en: false
+    publish.scan_publish_en: true
+    publish.dense_publish_en: true
+    publish.scan_bodyframe_pub_en: true

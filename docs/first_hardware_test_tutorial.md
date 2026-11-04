@@ -195,3 +195,5 @@ rsync -av "$h2_pc3_user@$h2_pc3_ip:$h2_pc3_repo/log/mapping/build-summary.txt" \
 ```
 
 先确认第一个 `rsync` 成功。回传结果在开发机仓库的 `data/from-h2/first-test-001/`，可用 `ls data/from-h2/first-test-001/` 查看。如果构建阶段失败，对应构建记录可能尚未生成，先保留终端错误和已有日志。状态探针的可选日志见[数据回传清单](first_hardware_test.md#7-将数据带回开发机)。
+
+数据回传完成后，可在开发机按[静态 LIO 回放说明](lio_static_replay.md)验证初始化和静止轨迹。

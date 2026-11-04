@@ -6,6 +6,7 @@ on:
       - dependencies/**
       - scripts/*mapping*
       - scripts/fetch_navigation_sources.sh
+      - tests/bringup/**
       - tests/ros/test_mapping_binaries.py
       - tests/ros/test_readonly_capture.py
       - tools/readonly_capture.py
@@ -28,6 +29,8 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Install versioned mapping prerequisites
         run: bash scripts/install_mapping_dependencies.sh
+      - name: Check sensor and replay configuration boundaries
+        run: python3 -m unittest discover -s tests/bringup -v
       - name: Fetch immutable source versions and submodules
         run: bash scripts/fetch_navigation_sources.sh
       - name: Build SDK, Livox driver and FAST-LIO2

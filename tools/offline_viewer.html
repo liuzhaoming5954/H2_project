@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>三维点云与轨迹</title>
+<style>
+  :root { color-scheme: light; font: 16px/1.5 system-ui, sans-serif; color: #24363a; background: #f5f6f2; }
+  * { box-sizing: border-box; }
+  main { max-width: 1560px; margin: auto; padding: clamp(12px, 2.5vw, 40px); }
+  h1 { margin: 0; font-size: clamp(24px, 2.3vw, 36px); font-weight: 650; }
+  p { margin: 5px 0; }
+  header, .bar, footer, nav, .legend { display: flex; align-items: center; gap: 10px 18px; flex-wrap: wrap; }
+  header, .bar { justify-content: space-between; }
+  nav { gap: 12px; }
+  a { color: #126177; }
+  .bar { margin: 18px 0 9px; }
+  button { background: white; color: #24363a; border: 1px solid #b7c6c8; padding: 5px 12px; border-radius: 4px; font: inherit; cursor: pointer; }
+  button:hover, button:focus-visible { background: #dfedef; }
+  canvas { display: block; width: 100%; height: clamp(330px, 64vh, 850px); background: white;
+           border: 1px solid #c8d3d0; touch-action: none; cursor: grab; }
+  canvas:active { cursor: grabbing; }
+  .legend { gap: 12px; }
+  .key { display: inline-block; vertical-align: middle; margin-right: 4px; }
+  .line { width: 22px; height: 3px; background: #2b3f69; }
+  .start { width: 12px; height: 12px; border: 3px solid #18748e; border-radius: 50%; }
+  .end { color: #cc5928; font-weight: bold; font-size: 22px; line-height: 12px; }
+  .gradient { width: 65px; height: 9px; background: linear-gradient(90deg,#283060,#226e8d,#309d8d,#a1b14a,#e69832); }
+  footer { color: #445b5f; margin-top: 9px; justify-content: space-between; }
+</style>
+<main>
+  <header>
+    <div><h1>三维点云与轨迹</h1><p>FAST-LIO · camera_init 坐标系 · 单位为米</p></div>
+    <nav aria-label="查看 PNG"><a href="trajectory.png">轨迹图</a><a href="pointcloud.png">点云投影</a><a id="overlay" href="closure_overlay.png" hidden>首尾点云叠加</a></nav>
+  </header>
+  <div class="bar">
+    <span class="legend">
+      <span><i class="key line"></i>轨迹</span>
+      <span><i class="key start"></i>起点</span>
+      <span><i class="key end">×</i>终点</span>
+      <span><i class="key gradient"></i><span id="height">点云 Z 坐标</span></span>
+    </span>
+    <span>
+      <button id="smaller" aria-label="缩小">−</button>
+      <button id="larger" aria-label="放大">＋</button>
+      <button id="xy">XY 视图</button>
+      <button id="reset">复位</button>
+    </span>
+  </div>
+  <canvas id="view" tabindex="0" aria-label="可旋转的点云三维视图。方向键旋转，加减键缩放，Home 复位。">可打开本页上方的轨迹图和点云投影。</canvas>
+  <footer><span>拖动旋转，Shift 加拖动平移，滚轮或按钮缩放。</span><span id="count"></span></footer>
+  <noscript><p>请使用上方的静态图链接查看轨迹和点云。</p></noscript>
+</main>
+<script type="application/json" id="dataset">__DATA__</script>
+<script>
+"use strict";
+const data = JSON.parse(document.getElementById("dataset").textContent);
+function unpack(encoded) {
+  const bytes = Uint8Array.from(atob(encoded), char => char.charCodeAt(0));
+  const view = new DataView(bytes.buffer);
+  const points = new Float32Array(bytes.byteLength / 4);
+  for (let i = 0; i < points.length; ++i) points[i] = view.getFloat32(4 * i, true);
+  return points;
+}
+const cloud = unpack(data.cloud);
+const track = unpack(data.track);
+const canvas = document.getElementById("view");
+const ctx = canvas.getContext("2d");
+const [cx, cy, cz] = data.center;
+const [lowZ, highZ] = data.zRange;
+const levels = new Uint8Array(cloud.length / 3);
+for (let i = 0; i < levels.length; ++i) {
+  const fraction = (cloud[3 * i + 2] - lowZ) / Math.max(highZ - lowZ, 1e-9);
+  levels[i] = Math.round(255 * Math.min(1, Math.max(0, fraction)));
+}
+const fmt = new Intl.NumberFormat("zh-CN");
+document.getElementById("height").textContent = `Z  ${lowZ.toFixed(2)} 至 ${highZ.toFixed(2)} m`;
+document.getElementById("count").textContent =
+  `预览点云 ${fmt.format(levels.length)} / ${fmt.format(data.mapCount)} 点 · 轨迹 ${fmt.format(track.length / 3)} / ${fmt.format(data.trackCount)} 个位置`;
+document.getElementById("overlay").hidden = !data.hasOverlay;
+
+let yaw = -0.65, elevation = 0.55, zoom = 1, panX = 0, panY = 0;
+let pending = false;
+let depth, raster;
+function schedule() {
+  if (!pending && ctx) {
+    pending = true;
+    requestAnimationFrame(draw);
+  }
+}
+function draw() {
+  pending = false;
+  // Bound both the depth buffer and raster on a high-resolution display.
+  const ratio = Math.min(window.devicePixelRatio || 1, 1.5, 1800 / canvas.clientWidth, 1000 / canvas.clientHeight);
+  const w = Math.max(1, Math.round(canvas.clientWidth * ratio));
+  const h = Math.max(1, Math.round(canvas.clientHeight * ratio));
+  if (!raster || canvas.width !== w || canvas.height !== h) {
+    canvas.width = w;
+    canvas.height = h;
+    raster = ctx.createImageData(w, h);
+    depth = new Float32Array(w * h);
+  }
+  raster.data.fill(255);
+  depth.fill(-Infinity);
+  const c = Math.cos(yaw), s = Math.sin(yaw);
+  const t = Math.sin(elevation), u = Math.cos(elevation);
+  const scale = zoom * Math.min(w, h) / data.span;
+  const ox = w / 2 + panX * ratio, oy = h / 2 + panY * ratio;
+  for (let i = 0; i < levels.length; ++i) {
+    const j = 3 * i;
+    const x = cloud[j] - cx, y = cloud[j + 1] - cy, z = cloud[j + 2] - cz;
+    const across = -s * x + c * y;
+    const px = Math.round(ox + scale * (c * x + s * y));
+    const py = Math.round(oy - scale * (t * across + u * z));
+    if (px < 0 || py < 0 || px >= w || py >= h) continue;
+    const index = py * w + px;
+    const distance = -u * across + t * z;
+    if (distance < depth[index]) continue;
+    depth[index] = distance;
+    const color = data.palette[levels[i]];
+    raster.data[4 * index] = color[0];
+    raster.data[4 * index + 1] = color[1];
+    raster.data[4 * index + 2] = color[2];
+  }
+  ctx.putImageData(raster, 0, 0);
+
+  function projectTrack(i) {
+    const x = track[i] - cx, y = track[i + 1] - cy, z = track[i + 2] - cz;
+    return [ox + scale * (c * x + s * y), oy - scale * (t * (-s * x + c * y) + u * z)];
+  }
+  ctx.lineWidth = 2 * ratio;
+  ctx.strokeStyle = "#2b3f69";
+  ctx.beginPath();
+  ctx.moveTo(...projectTrack(0));
+  for (let i = 3; i < track.length; i += 3) ctx.lineTo(...projectTrack(i));
+  ctx.stroke();
+  ctx.beginPath();
+  const [sx, sy] = projectTrack(0);
+  ctx.arc(sx, sy, 7 * ratio, 0, 2 * Math.PI);
+  ctx.strokeStyle = "#18748e";
+  ctx.stroke();
+  const [ex, ey] = projectTrack(track.length - 3), arm = 4 * ratio;
+  ctx.beginPath();
+  ctx.moveTo(ex - arm, ey - arm); ctx.lineTo(ex + arm, ey + arm);
+  ctx.moveTo(ex + arm, ey - arm); ctx.lineTo(ex - arm, ey + arm);
+  ctx.strokeStyle = "#cc5928";
+  ctx.stroke();
+
+  // Keep the camera-aligned axis legend and the metric ruler fixed on screen.
+  ctx.save();
+  ctx.scale(ratio, ratio);
+  const bottom = h / ratio - 55;
+  ctx.fillStyle = "rgba(255,255,255,.86)";
+  ctx.fillRect(4, bottom - 49, 100, 100);
+  ctx.font = "13px system-ui, sans-serif";
+  ctx.lineWidth = 2;
+  const axes = [["X", c, t * s, "#a84c38"], ["Y", s, -t * c, "#207c72"], ["Z", 0, -u, "#3157a0"]];
+  for (const [label, dx, dy, color] of axes) {
+    ctx.beginPath();
+    ctx.moveTo(54, bottom);
+    ctx.lineTo(54 + 32 * dx, bottom + 32 * dy);
+    ctx.strokeStyle = color;
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.fillText(label, 54 + 39 * dx - 4, bottom + 39 * dy + 4);
+  }
+  const target = 90 * ratio / scale;
+  const unit = 10 ** Math.floor(Math.log10(target));
+  const metres = [5, 2, 1].find(step => step * unit <= target) * unit;
+  const endX = w / ratio - 20, barWidth = metres * scale / ratio, barY = h / ratio - 17;
+  ctx.fillStyle = "rgba(255,255,255,.86)";
+  ctx.fillRect(endX - barWidth - 10, barY - 27, barWidth + 20, 39);
+  ctx.fillStyle = "#263d42";
+  ctx.fillRect(endX - barWidth, barY, barWidth, 2);
+  ctx.textAlign = "center";
+  ctx.fillText(`${Number(metres.toPrecision(4))} m`, endX - barWidth / 2, barY - 5);
+  ctx.restore();
+}
+function changeZoom(factor) {
+  zoom = Math.min(100, Math.max(0.08, zoom * factor));
+  schedule();
+}
+function reset() {
+  yaw = -0.65; elevation = 0.55; panX = 0; panY = 0; zoom = 1;
+  schedule();
+}
+function rotate(dx, dy) {
+  yaw -= dx;
+  elevation = Math.min(Math.PI / 2, Math.max(-Math.PI / 2, elevation + dy));
+  schedule();
+}
+document.getElementById("larger").onclick = () => changeZoom(1.25);
+document.getElementById("smaller").onclick = () => changeZoom(0.8);
+document.getElementById("reset").onclick = reset;
+document.getElementById("xy").onclick = () => { yaw = 0; elevation = Math.PI / 2; schedule(); };
+let drag = null;
+canvas.onpointerdown = event => {
+  if (!event.isPrimary || event.button !== 0) return;
+  drag = [event.clientX, event.clientY];
+  canvas.setPointerCapture(event.pointerId);
+};
+canvas.onpointermove = event => {
+  if (!drag || !event.isPrimary) return;
+  const dx = event.clientX - drag[0], dy = event.clientY - drag[1];
+  drag = [event.clientX, event.clientY];
+  if (event.shiftKey) {
+    panX += dx; panY += dy;
+    schedule();
+  } else {
+    rotate(dx * 0.009, dy * 0.009);
+  }
+};
+canvas.onlostpointercapture = () => { drag = null; };
+canvas.addEventListener("wheel", event => {
+  event.preventDefault();
+  changeZoom(Math.exp(-0.002 * Math.max(-150, Math.min(150, event.deltaY))));
+}, {passive: false});
+canvas.onkeydown = event => {
+  const actions = {ArrowLeft: () => rotate(-0.12, 0), ArrowRight: () => rotate(0.12, 0),
+    ArrowUp: () => rotate(0, 0.12), ArrowDown: () => rotate(0, -0.12), Home: reset,
+    "+": () => changeZoom(1.25), "=": () => changeZoom(1.25), "-": () => changeZoom(0.8)};
+  if (Object.hasOwn(actions, event.key)) { event.preventDefault(); actions[event.key](); }
+};
+window.addEventListener("resize", schedule);
+schedule();
+</script>
+</html>

@@ -10,6 +10,9 @@ on:
       - tests/ros/test_mapping_binaries.py
       - tests/ros/test_readonly_capture.py
       - tools/readonly_capture.py
+      - tools/offline_*.py
+      - tools/offline_viewer.html
+      - tests/offline/**
       - src/h2_bringup/**
       - .github/workflows/mapping.yml
   workflow_dispatch:
@@ -31,6 +34,8 @@ jobs:
         run: bash scripts/install_mapping_dependencies.sh
       - name: Check sensor and replay configuration boundaries
         run: python3 -m unittest discover -s tests/bringup -v
+      - name: Verify offline map geometry, endpoint diagnostics and file exports
+        run: python3 -m unittest discover -s tests/offline -v
       - name: Fetch immutable source versions and submodules
         run: bash scripts/fetch_navigation_sources.sh
       - name: Build SDK, Livox driver and FAST-LIO2

@@ -1,2 +1,4 @@
 # Patch context preserves whitespace from the fixed upstream revision.
 dependencies/patches/*.patch -whitespace
+# Site map bytes are hashed and must survive every checkout unchanged.
+/maps/site-001/**/*.ply binary

@@ -25,3 +25,5 @@ python3 -m unittest discover -s tests/tools -v
 ```
 
 ROS 环境检查和构建需先加载 `/opt/ros/jazzy/setup.bash` 或实际的 Jazzy 安装环境；工具按 `PATH` 查找 CMake/colcon，不依赖某个临时安装路径。
+
+首轮上机新增工具：`readonly_environment.py` 收集本机/PC3 环境与网卡清单；`readonly_capture.py inspect/record` 订阅原始 MID-360 双流并检查或录制，使用新输出路径且保留版本/配置快照；`h2_state_probe` 是独立的原生 SDK 被动订阅程序。完整部署、域隔离、真实配置和输出范围见 [首轮只读上机测试](../docs/first_hardware_test.md)。本地合成输入测试只证明采集工具行为，实际传感器/H2 数据仍需上机验证。

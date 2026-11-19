@@ -54,3 +54,9 @@ FAST-LIO 补丁处理 C++ 标准选项冲突、先填写当前帧 pose covarianc
 - 下载、安装、编译和无输入启动验证分别记录。没有真实 MID-360 bag 回归、Thor 构建或 H2 验收时，不表示导航功能已完成。
 
 当前证据见 [实现状态](../docs/implementation_status.md)。基础工程检查仍使用 `tools/h2ctl.py check --profile core/ros`；算法依赖构建不会自动进入运动链。
+
+## 可选 H2 被动状态 SDK
+
+首轮原始状态采集额外使用 [h2_state.repos](h2_state.repos) 锁定的官方 [unitree_sdk2](https://github.com/unitreerobotics/unitree_sdk2/tree/8e1b927586712edd6a4c29d50dd52dff1e163439)。使用 `scripts/fetch_h2_state_source.sh` 和 `scripts/build_h2_state_probe.sh` 单独下载/原生构建 `tools/h2_state_probe`，不加入 ROS colcon 链。它只订阅 H2 官方示例中的 lowstate/secondary_imu，不运行上游控制示例。
+
+SDK 自带预编译库及 Cyclone DDS，构建和运行使用独立环境、私有 DDS 库；Ubuntu 24.04/x86_64 编译通过不代表 Thor ABI 已验证。状态探针输出采样后的原始 JSONL，不提供 ROS 标准姿态、机体 odom 或运动许可。命令和字段限制见 [首轮上机说明](../docs/first_hardware_test.md)。

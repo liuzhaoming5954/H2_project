@@ -10,6 +10,7 @@ on:
       - tests/ros/test_mapping_binaries.py
       - tests/ros/test_readonly_capture.py
       - tools/readonly_capture.py
+      - maps/site-001/**
       - tools/offline_*.py
       - tools/offline_viewer.html
       - tests/offline/**
@@ -32,6 +33,9 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Install versioned mapping prerequisites
         run: bash scripts/install_mapping_dependencies.sh
+      - name: Verify published site map bundle
+        working-directory: maps/site-001
+        run: sha256sum --check SHA256SUMS
       - name: Check sensor and replay configuration boundaries
         run: python3 -m unittest discover -s tests/bringup -v
       - name: Verify offline map geometry, endpoint diagnostics and file exports
